@@ -14,8 +14,22 @@ import {
   X,
 } from "lucide-react";
 import { getAllMembers, addMemberToStorage } from "../utils/memberStorage";
+import { GYM_PRICING } from "../data/pricing"; // <-- IMPORT PRICING
 
 const MEMBERSHIP_PLANS = ["Weekly", "Monthly", "3 Months", "6 Months"];
+
+// Plan duration in days
+const PLAN_DAYS = {
+  Weekly: 7,
+  Monthly: 30,
+  "3 Months": 90,
+  "6 Months": 180,
+};
+
+// Helper: Get price based on BOTH type and plan
+const getPlanPrice = (type, plan) => {
+  return GYM_PRICING?.[type]?.[plan] || 0;
+};
 
 export default function RegisterMember() {
   const navigate = useNavigate();
@@ -34,6 +48,7 @@ export default function RegisterMember() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Generate the next sequential member ID (e.g., M-0001, M-0002, etc.)
   const generateMemberId = () => {
     const existing = getAllMembers();
     const numericIds = existing
@@ -49,6 +64,7 @@ export default function RegisterMember() {
     e.preventDefault();
     if (!formData.name.trim()) return alert("Please enter a member name");
 
+    // Check for duplicate names (case-insensitive)
     const existing = getAllMembers();
     const duplicate = existing.find(
       (m) => m.name.toLowerCase() === formData.name.toLowerCase().trim()
@@ -59,11 +75,14 @@ export default function RegisterMember() {
 
     const memberId = generateMemberId();
 
+    // Calculate start/end dates based on plan
     const today = new Date();
     const startDate = today.toISOString().split("T")[0];
-    const planDays = { Weekly: 7, Monthly: 30, "3 Months": 90, "6 Months": 180 };
     const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + (planDays[formData.plan] || 30));
+    endDate.setDate(endDate.getDate() + (PLAN_DAYS[formData.plan] || 30));
+
+    // FIXED: Look up price by BOTH type and plan
+    const planAmount = getPlanPrice(formData.type, formData.plan);
 
     const member = {
       id: memberId,
@@ -75,17 +94,16 @@ export default function RegisterMember() {
       endDate: endDate.toISOString().split("T")[0],
       status: "Active",
       isInside: false,
-      amount: 0,
+      amount: planAmount,
       qrValue: memberId,
     };
 
     addMemberToStorage(member);
     setNewMember(member);
 
-    // Reset form fields immediately so if the modal is closed, the form is empty
+    // Reset form fields
     setFormData({ name: "", type: "Regular", plan: "Monthly", contact: "" });
 
-    // Open the success modal
     setShowSuccessModal(true);
   };
 
@@ -126,6 +144,9 @@ export default function RegisterMember() {
 
   const getInitials = (name) =>
     name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2);
+
+  // Current preview price (updates live as user changes type/plan)
+  const previewPrice = getPlanPrice(formData.type, formData.plan);
 
   return (
     <>
@@ -217,6 +238,21 @@ export default function RegisterMember() {
               </div>
             </div>
 
+            {/* Live price preview — updates when type OR plan changes */}
+            <div className="rounded-xl border border-gold-500/20 bg-gold-500/5 p-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-ink-950/60">
+                  Total Amount
+                  <span className="ml-1 font-medium text-ink-950/40">
+                    ({formData.type} · {formData.plan})
+                  </span>
+                </span>
+                <span className="text-base font-extrabold text-ink-950">
+                  ₱{previewPrice.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 border-t border-ink-950/5 pt-5">
               <button
                 type="button"
@@ -237,15 +273,12 @@ export default function RegisterMember() {
         </div>
       </div>
 
-      {/* 
-        SUCCESS MODAL (Pop-up)
-        Appears after successful registration with member details + QR code
-      */}
+      {/* SUCCESS MODAL */}
       {showSuccessModal && newMember && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4 animate-fade-in">
           <div className="max-h-[95vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl animate-slide-up sm:animate-fade-in">
-            
-            {/* Modal Header - Success Banner */}
+
+            {/* Success Banner */}
             <div className="relative bg-emerald-50 p-5">
               <button
                 onClick={handleCloseModal}
@@ -271,10 +304,8 @@ export default function RegisterMember() {
 
             {/* ID Card Preview */}
             <div className="p-5">
-              
-              {/* Card */}
               <div className="overflow-hidden rounded-2xl border border-ink-950/10 shadow-sm">
-                
+
                 {/* Card Header */}
                 <div className="flex items-center justify-between bg-ink-950 px-5 py-3">
                   <div className="flex items-center gap-2">
@@ -292,7 +323,7 @@ export default function RegisterMember() {
 
                 {/* Card Body */}
                 <div className="flex flex-col gap-5 bg-white p-5 sm:flex-row sm:items-center sm:gap-6">
-                  
+
                   {/* LEFT: Member Info */}
                   <div className="flex flex-1 items-center gap-4">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gold-500 text-lg font-extrabold text-ink-950">

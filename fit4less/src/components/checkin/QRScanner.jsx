@@ -3,22 +3,28 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { QrCode, Camera, X, AlertTriangle } from 'lucide-react';
 import Button from '../ui/Button';
+import { getAllMembers } from '../../utils/memberStorage';
 
 const QRScanner = ({ onScanSuccess, onScanFailure }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState('');
   const [lastScanned, setLastScanned] = useState('');
   const scannerRef = useRef(null);
-  const scannedRef = useRef(false); // Prevents duplicate scans from same QR
+  const scannedRef = useRef(false);
 
   const qrCodeRegionId = "qr-reader";
 
-  const isInsecureContext = 
+  // Detect insecure context (HTTP on non-localhost)
+  const isInsecureContext =
     typeof window !== 'undefined' &&
     window.location.protocol === 'http:' &&
     window.location.hostname !== 'localhost' &&
     window.location.hostname !== '127.0.0.1';
 
+  /**
+   * iOS Safari requires these attributes on the injected video element
+   * for the camera feed to render inline instead of going fullscreen.
+   */
   const applyVideoAttributes = () => {
     const video = document.querySelector(`#${qrCodeRegionId} video`);
     if (video) {
@@ -31,62 +37,58 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
     }
   };
 
+  /**
+   * Fires when html5-qrcode successfully decodes a QR code.
+   */
   const handleScanResult = (decodedText) => {
-    // Prevent multiple scans in quick succession
+    // Prevent duplicate scans from the same QR
     if (scannedRef.current) return;
     scannedRef.current = true;
 
-    console.log("✅ QR Detected:", decodedText);
+    console.log("[QRScanner] Detected:", decodedText);
     setLastScanned(decodedText);
 
-    // Vibrate on success (mobile only)
+    // Haptic feedback on supported devices
     if (navigator.vibrate) navigator.vibrate(100);
 
-    // Stop scanner then pass the data up
+    // Stop the camera first, then pass the value to the parent
     stopScanner().then(() => {
       if (onScanSuccess) onScanSuccess(decodedText);
     });
   };
 
+  /**
+   * Start the camera and begin scanning for QR codes.
+   */
   const startScanner = async () => {
     setError('');
     setIsScanning(true);
     scannedRef.current = false;
 
-    // Wait a tick for the DOM to render the qr-reader div
+    // Give the DOM a moment to render the qr-reader container
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     const html5QrCode = new Html5Qrcode(qrCodeRegionId, {
-      // Use native BarcodeDetector API (fast on mobile)
-      useBarCodeDetectorIfSupported: true,
+      useBarCodeDetectorIfSupported: true, // Use native API when available
       verbose: false,
     });
     scannerRef.current = html5QrCode;
 
     const config = {
-      // Higher FPS = faster detection
       fps: 15,
-
-      // Larger scan box (80%) so big QR codes fit inside
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
         const qrboxSize = Math.floor(minEdge * 0.8);
         return { width: qrboxSize, height: qrboxSize };
       },
-
       aspectRatio: 1.0,
       disableFlip: false,
-
-      // Only look for QR codes (skips other barcode types)
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-
       videoConstraints: {
         facingMode: { ideal: "environment" },
         width: { ideal: 1280 },
         height: { ideal: 720 },
       },
-
-      // Experimental: better low-contrast detection
       experimentalFeatures: {
         useBarCodeDetectorIfSupported: true,
       },
@@ -98,18 +100,18 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
         config,
         handleScanResult,
         (errorMessage) => {
-          // Called constantly when no QR detected — that's fine
+          // Called constantly when no QR is in frame - not a real error
           if (onScanFailure) onScanFailure(errorMessage);
         }
       );
 
-      // iOS video attribute fixes
+      // Apply iOS video fixes with retries
       applyVideoAttributes();
       setTimeout(applyVideoAttributes, 300);
       setTimeout(applyVideoAttributes, 800);
 
     } catch (err) {
-      console.error("❌ Error starting scanner:", err);
+      console.error("[QRScanner] Error starting scanner:", err);
 
       let errorMsg = "Could not access camera.";
       if (err.name === 'NotAllowedError' || err.message?.includes('Permission')) {
@@ -127,13 +129,16 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
     }
   };
 
+  /**
+   * Stop the camera and clean up the scanner instance.
+   */
   const stopScanner = async () => {
     if (scannerRef.current) {
       try {
         await scannerRef.current.stop();
         scannerRef.current.clear();
       } catch (err) {
-        console.error("Error stopping scanner:", err);
+        console.error("[QRScanner] Error stopping scanner:", err);
       }
       scannerRef.current = null;
     }
@@ -147,40 +152,51 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
     };
   }, []);
 
-  // Dynamic simulate: picks a random member from localStorage
+  /**
+   * Simulate Scan (Dev)
+   * Always simulates scanning the first prototype member (Juan Dela Cruz).
+   * Uses the shared getAllMembers() helper which auto-seeds MOCK_MEMBERS
+   * if localStorage is empty — so it works on first-ever load.
+   */
   const handleSimulateScan = () => {
-    const allMembers = JSON.parse(localStorage.getItem("fit4less_members") || "[]");
-    if (allMembers.length === 0) {
-      return alert("No members registered yet! Register one first.");
+    const allMembers = getAllMembers();
+
+    if (!allMembers || allMembers.length === 0) {
+      return alert("No members found. Please register a member first.");
     }
-    const randomMember = allMembers[Math.floor(Math.random() * allMembers.length)];
-    const qrValue = randomMember.qrValue || randomMember.id;
-    console.log("🎲 Simulating scan of:", qrValue);
-    onScanSuccess && onScanSuccess(qrValue);
+
+    // Use the first member (prototype: Juan Dela Cruz with ID M-0001)
+    const prototypeMember = allMembers[0];
+    const qrValue = prototypeMember.qrValue || prototypeMember.id;
+
+    console.log(
+      "[QRScanner] Simulating scan of prototype member:",
+      prototypeMember.name,
+      "→",
+      qrValue
+    );
+
+    if (onScanSuccess) onScanSuccess(qrValue);
   };
 
   return (
     <div className="flex flex-col items-center gap-3 p-4 pb-6">
-      
+
       {/* Insecure Connection Warning */}
       {isInsecureContext && !isScanning && (
         <div className="flex w-full max-w-[300px] items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
           <p className="text-[11px] leading-relaxed text-amber-700">
-            Camera requires <strong>https://</strong> on mobile. Use "Simulate Scan" to test below.
+            Camera requires <strong>https://</strong> on mobile. Use "Simulate Scan" below to test.
           </p>
         </div>
       )}
 
       {/* Scanner Container */}
       <div className="relative w-full max-w-[300px] overflow-hidden rounded-2xl border-2 border-ink-950/5 bg-gray-900">
-        
-        <div 
-          id={qrCodeRegionId} 
-          className="h-[280px] w-full object-cover"
-        ></div>
+        <div id={qrCodeRegionId} className="h-[280px] w-full object-cover"></div>
 
-        {/* Placeholder when not scanning */}
+        {/* Placeholder when idle */}
         {!isScanning && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface/95 backdrop-blur-sm">
             <QrCode size={40} className="mb-2 text-ink-950/30" />
@@ -207,7 +223,7 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
       {/* Last Scanned Debug Info */}
       {lastScanned && (
         <p className="text-[10px] font-bold text-emerald-600">
-          ✓ Last detected: {lastScanned}
+          Last detected: {lastScanned}
         </p>
       )}
 
@@ -231,8 +247,9 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
             Open Camera
           </Button>
         )}
-        
-        <button 
+
+        <button
+          type="button"
           onClick={handleSimulateScan}
           className="text-[11px] text-ink-950/40 underline transition-colors hover:text-ink-950/60"
         >
