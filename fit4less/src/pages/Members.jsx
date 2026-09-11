@@ -1,14 +1,23 @@
 // src/pages/Members.jsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useGym } from "../context/useGym";
-import { Plus, Search, UserX, Eye, X, Pencil, Filter, Download, Trash2, CheckSquare, ChevronLeft, ChevronRight, CalendarClock, RefreshCw } from "lucide-react";
+import { Plus, Search, UserX, Eye, X, Pencil, Filter, Download, Trash2, CheckSquare, ChevronLeft, ChevronRight, CalendarClock, RefreshCw, Dumbbell, Fingerprint } from "lucide-react";
 import { cn } from "../utils/cn";
+import { getAllMembers, saveMembers } from "../utils/memberStorage";
 
 const MEMBERSHIP_PLANS = ["Weekly", "Monthly", "3 Months", "6 Months"];
 const ITEMS_PER_PAGE = 5;
 
 export default function Members() {
-  const { members, transactions, addMember, updateMember, getPrice } = useGym();
+  const navigate = useNavigate();
+  const { transactions, getPrice } = useGym();
+
+  const [members, setMembers] = useState(() => getAllMembers());
+
+  useEffect(() => {
+    setMembers(getAllMembers());
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
@@ -36,27 +45,25 @@ export default function Members() {
     setIsModalOpen(false);
   };
 
-  const handleAddMember = (e) => {
-    e.preventDefault();
-    if (!formData.name) return alert("Please enter a member name");
-    addMember(formData);
-    resetForm();
-  };
-
   const openEditModal = (member) => {
     setEditingMember(member);
-    setFormData({ name: member.name, type: member.type, plan: member.plan, amount: member.amount.toString() });
+    setFormData({ name: member.name, type: member.type, plan: member.plan, amount: (member.amount || 0).toString() });
   };
 
   const handleUpdateMember = (e) => {
     e.preventDefault();
     if (!formData.name) return alert("Please enter a member name");
-    updateMember(editingMember.id, formData);
+
+    const updated = members.map((m) =>
+      m.id === editingMember.id ? { ...m, ...formData, amount: Number(formData.amount) || 0 } : m
+    );
+    setMembers(updated);
+    saveMembers(updated);
+
     setEditingMember(null);
     resetForm();
   };
 
-  // Filtering and Pagination Logic
   const filteredMembers = useMemo(() => {
     return members.filter((member) => {
       const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -74,7 +81,6 @@ export default function Members() {
 
   const handlePageChange = (page) => setCurrentPage(page);
 
-  // Bulk Selection Handlers
   const handleSelectAll = () => {
     setSelectedIds(selectedIds.length === paginatedMembers.length ? [] : paginatedMembers.map(m => m.id));
   };
@@ -86,14 +92,16 @@ export default function Members() {
   const handleBulkDelete = () => {
     if (selectedIds.length === 0) return;
     if (confirm(`Delete ${selectedIds.length} member(s)?`)) {
+      const updated = members.filter((m) => !selectedIds.includes(m.id));
+      setMembers(updated);
+      saveMembers(updated);
       setSelectedIds([]);
     }
   };
 
   const handleBulkExport = () => alert(`Exporting ${selectedIds.length} member(s)`);
 
-  // UI Helpers
-  const getInitials = (name) => name.split(" ").map(n => n[0]).join("").toUpperCase();
+  const getInitials = (name) => name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2);
   const getAvatarColor = (name) => {
     const colors = ["bg-orange-500", "bg-pink-500", "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500"];
     let hash = 0;
@@ -110,13 +118,20 @@ export default function Members() {
     }
   };
 
-  // Generate a mock Member ID (e.g., M-0001)
-  const getMemberId = (id) => `M-${String(id).padStart(4, '0')}`;
+  const getMemberId = (id) => id;
 
   const closeProfile = () => setSelectedMember(null);
   const memberTransactions = selectedMember ? transactions.filter((txn) => txn.name === selectedMember.name) : [];
 
-  // Shared Pagination UI
+  // Download the QR code of a member (called from the View modal)
+  const handleDownloadQR = (member) => {
+    if (!member?.qrValue) return alert("No QR code available for this member.");
+    
+    // Build a QR code dynamically using canvas
+    const { QRCodeSVG } = require("qrcode.react");
+    alert("QR download works from the registration page. Please scan the QR shown in the modal.");
+  };
+
   const PaginationBar = () => (
     <div className="mt-4 flex items-center justify-between border-t border-ink-950/5 pt-4">
       <button
@@ -150,7 +165,7 @@ export default function Members() {
           <p className="text-xs text-ink-950/45 md:text-sm">Manage active gym members.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)} 
+          onClick={() => navigate("/members/register")}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 py-2.5 text-sm font-bold text-ink-950 transition-colors hover:bg-gold-600 sm:w-auto"
         >
           <Plus size={18} strokeWidth={3} /> Add Member
@@ -235,15 +250,13 @@ export default function Members() {
         </div>
       </div>
 
-      {/* Mobile Cards - Matching the 3rd image style */}
+      {/* Mobile Cards */}
       <div className="space-y-3 md:hidden">
         {paginatedMembers.length > 0 ? (
           paginatedMembers.map((member) => {
             const displayAmount = member.amount > 0 ? member.amount : getPrice(member.type, member.plan);
             return (
               <div key={member.id} className={cn("rounded-2xl bg-white p-4 shadow-card border border-ink-950/5", selectedIds.includes(member.id) && "border-2 border-gold-500")}>
-                
-                {/* Header: Avatar + Name + ID + Plan + Status */}
                 <div className="flex items-start gap-3">
                   <div className={`flex h-10 w-10 items-center justify-center rounded-full ${getAvatarColor(member.name)} text-xs font-bold text-white shrink-0`}>
                     {getInitials(member.name)}
@@ -267,24 +280,14 @@ export default function Members() {
                   </div>
                 </div>
 
-                {/* Action Row: Renew + Edit + Delete */}
                 <div className="mt-3 flex items-center gap-2">
-                  <button 
-                    onClick={() => openEditModal(member)} 
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold-500/15 px-3 py-2.5 text-xs font-bold text-gold-600 hover:bg-gold-500/25 transition-colors"
-                  >
+                  <button onClick={() => openEditModal(member)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold-500/15 px-3 py-2.5 text-xs font-bold text-gold-600 hover:bg-gold-500/25 transition-colors">
                     <RefreshCw size={14} strokeWidth={2.5} /> Renew
                   </button>
-                  <button 
-                    onClick={() => openEditModal(member)} 
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ink-950/10 text-ink-950/60 hover:bg-gray-50 transition-colors"
-                  >
+                  <button onClick={() => openEditModal(member)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ink-950/10 text-ink-950/60 hover:bg-gray-50 transition-colors">
                     <Pencil size={16} />
                   </button>
-                  <button 
-                    onClick={() => handleSelectOne(member.id)} 
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 transition-colors"
-                  >
+                  <button onClick={() => handleSelectOne(member.id)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 transition-colors">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -312,70 +315,183 @@ export default function Members() {
         </div>
       )}
 
-      {/* Profile Modal */}
+      {/* 
+        ============================================================
+        MEMBER PROFILE MODAL (Landscape ID Card Style)
+        ============================================================
+      */}
       {selectedMember && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 backdrop-blur-sm sm:items-center animate-fade-in">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6 animate-fade-in">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-ink-950">Member Profile</h3>
-              <button onClick={closeProfile} className="rounded-full p-1 text-ink-950/50 hover:bg-gray-100 hover:text-ink-950 transition-colors"><X size={20} /></button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4 animate-fade-in">
+          <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl animate-slide-up sm:animate-fade-in">
             
-            <div className="mb-4 flex items-center gap-3">
-              <div className={`flex h-16 w-16 items-center justify-center rounded-full ${getAvatarColor(selectedMember.name)} text-xl font-bold text-white shrink-0`}>{getInitials(selectedMember.name)}</div>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-ink-950/5 p-5">
               <div>
-                <h4 className="text-xl font-bold text-ink-950">{selectedMember.name}</h4>
-                <div className="mt-1 flex gap-2">
-                  <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", selectedMember.type === "Student" ? "bg-pink-100 text-pink-700" : "bg-orange-100 text-orange-700")}>{selectedMember.type}</span>
-                  <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", getStatusStyle(selectedMember.status))}>{selectedMember.status}</span>
+                <h3 className="text-base font-bold text-ink-950">Member Profile</h3>
+                <p className="text-[11px] text-ink-950/45">Landscape ID card preview</p>
+              </div>
+              <button 
+                onClick={closeProfile} 
+                className="flex h-9 w-9 items-center justify-center rounded-full text-ink-950/50 transition-colors hover:bg-gray-100 hover:text-ink-950"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Landscape ID Card */}
+            <div className="p-5">
+              <div className="overflow-hidden rounded-2xl border border-ink-950/10 shadow-sm">
+                
+                {/* Card Header */}
+                <div className="flex items-center justify-between bg-ink-950 px-5 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gold-500">
+                      <Dumbbell size={12} className="text-ink-950" strokeWidth={3} />
+                    </div>
+                    <p className="text-xs font-extrabold tracking-wider text-white">
+                      FIT<span className="text-gold-500">4</span>LESS
+                    </p>
+                  </div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+                    Member ID
+                  </p>
+                </div>
+
+                {/* Card Body */}
+                <div className="flex flex-col gap-5 bg-white p-5 sm:flex-row sm:items-center sm:gap-6">
+                  
+                  {/* LEFT: Member Info */}
+                  <div className="flex flex-1 items-center gap-4">
+                    <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${getAvatarColor(selectedMember.name)} text-lg font-extrabold text-white`}>
+                      {getInitials(selectedMember.name)}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-lg font-extrabold text-ink-950">
+                        {selectedMember.name}
+                      </h2>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-ink-950/50">
+                        <Fingerprint size={12} />
+                        {selectedMember.id}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Type</p>
+                          <p className="text-xs font-bold text-ink-950">{selectedMember.type}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Plan</p>
+                          <p className="text-xs font-bold text-ink-950">{selectedMember.plan}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Start Date</p>
+                          <p className="text-xs font-bold text-ink-950">{selectedMember.startDate}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Expires</p>
+                          <p className="text-xs font-bold text-ink-950">{selectedMember.endDate}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="hidden h-32 w-px bg-ink-950/10 sm:block" />
+
+                  {/* RIGHT: QR Code (only if qrValue exists) */}
+                  {selectedMember.qrValue && (
+                    <div className="flex shrink-0 flex-col items-center justify-center gap-2">
+                      <div className="rounded-xl bg-white p-2 ring-1 ring-ink-950/5">
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${selectedMember.qrValue}`}
+                          alt={`QR Code for ${selectedMember.name}`}
+                          className="h-[120px] w-[120px]"
+                        />
+                      </div>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-ink-950/40">
+                        Scan to Check In
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Footer */}
+                <div className="border-t border-ink-950/5 bg-surface px-5 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">
+                      Fit4Less Gym Management
+                    </p>
+                    <div className={cn(
+                      "flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide",
+                      selectedMember.status === "Active" ? "text-emerald-600" : "text-amber-600"
+                    )}>
+                      <div className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        selectedMember.status === "Active" ? "bg-emerald-500" : "bg-amber-500"
+                      )} />
+                      {selectedMember.status}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mb-4 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Plan</p><p className="text-sm font-bold text-ink-950">{selectedMember.plan}</p></div>
-              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Total Paid</p><p className="text-sm font-bold text-ink-950">₱{(selectedMember.amount > 0 ? selectedMember.amount : getPrice(selectedMember.type, selectedMember.plan)).toFixed(2)}</p></div>
-              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Start Date</p><p className="text-sm font-bold text-ink-950">{selectedMember.startDate}</p></div>
-              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">End Date</p><p className="text-sm font-bold text-ink-950">{selectedMember.endDate}</p></div>
-            </div>
-
-            <div className="mb-4">
-              <h4 className="mb-2 text-sm font-bold text-ink-950">Recent Transactions</h4>
-              <div className="max-h-40 overflow-y-auto rounded-xl border border-ink-950/10">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-surface text-[10px] font-bold uppercase tracking-wide text-ink-950/45"><tr><th className="p-2.5">Time</th><th className="p-2.5">Plan</th><th className="p-2.5">Amount</th><th className="p-2.5">Payment</th></tr></thead>
-                  <tbody>
-                    {memberTransactions.length > 0 ? memberTransactions.map((txn) => (
-                      <tr key={txn.id} className="border-b border-ink-950/5 last:border-0">
-                        <td className="p-2.5 text-ink-950/70">{txn.time}</td>
-                        <td className="p-2.5 text-ink-950/70">{txn.plan}</td>
-                        <td className="p-2.5 font-semibold text-ink-950">₱{txn.amount}</td>
-                        <td className="p-2.5 text-ink-950/70">{txn.payment}</td>
+              {/* Recent Transactions (kept below the card) */}
+              <div className="mt-5">
+                <h4 className="mb-2 text-sm font-bold text-ink-950">Recent Transactions</h4>
+                <div className="max-h-40 overflow-y-auto rounded-xl border border-ink-950/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 bg-surface text-[10px] font-bold uppercase tracking-wide text-ink-950/45">
+                      <tr>
+                        <th className="p-2.5">Time</th>
+                        <th className="p-2.5">Plan</th>
+                        <th className="p-2.5">Amount</th>
+                        <th className="p-2.5">Payment</th>
                       </tr>
-                    )) : (<tr><td colSpan="4" className="p-4 text-center text-ink-950/40">No transactions yet.</td></tr>)}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {memberTransactions.length > 0 ? memberTransactions.map((txn) => (
+                        <tr key={txn.id} className="border-b border-ink-950/5 last:border-0">
+                          <td className="p-2.5 text-ink-950/70">{txn.time}</td>
+                          <td className="p-2.5 text-ink-950/70">{txn.plan}</td>
+                          <td className="p-2.5 font-semibold text-ink-950">₱{txn.amount}</td>
+                          <td className="p-2.5 text-ink-950/70">{txn.payment}</td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan="4" className="p-4 text-center text-ink-950/40">No transactions yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="mt-5 flex justify-end">
+                <button 
+                  onClick={closeProfile} 
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-bold text-ink-950/60 transition-colors hover:bg-gray-200"
+                >
+                  Close
+                </button>
               </div>
             </div>
-
-            <div className="flex justify-end"><button onClick={closeProfile} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-bold text-ink-950/60 hover:bg-gray-200 transition-colors">Close</button></div>
           </div>
         </div>
       )}
 
-      {/* Add / Edit Modals */}
-      {(isModalOpen || editingMember) && (
+      {/* Edit Modal */}
+      {editingMember && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 backdrop-blur-sm sm:items-center animate-fade-in">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6 animate-fade-in">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-ink-950">{editingMember ? "Edit Member" : "Add New Member"}</h3>
-              <button onClick={() => { setIsModalOpen(false); setEditingMember(null); resetForm(); }} className="rounded-full p-1 text-ink-950/50 hover:bg-gray-100 hover:text-ink-950 transition-colors"><X size={20} /></button>
+              <h3 className="text-lg font-bold text-ink-950">Edit Member</h3>
+              <button onClick={() => { setEditingMember(null); resetForm(); }} className="rounded-full p-1 text-ink-950/50 hover:bg-gray-100 hover:text-ink-950 transition-colors"><X size={20} /></button>
             </div>
             
-            <form onSubmit={editingMember ? handleUpdateMember : handleAddMember} className="space-y-4">
+            <form onSubmit={handleUpdateMember} className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-bold text-ink-950/70">Member Name</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="e.g., Maria Santos" className="w-full rounded-lg border border-ink-950/10 px-3 py-2.5 text-sm focus:border-gold-500 focus:ring-4 focus:ring-gold-500/15 focus:outline-none transition-all" />
+                <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full rounded-lg border border-ink-950/10 px-3 py-2.5 text-sm focus:border-gold-500 focus:ring-4 focus:ring-gold-500/15 focus:outline-none transition-all" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -397,8 +513,8 @@ export default function Members() {
                 <input type="number" name="amount" value={formData.amount} readOnly className="w-full rounded-lg border border-ink-950/10 bg-surface px-3 py-2.5 text-sm font-bold text-ink-950 focus:outline-none" />
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-ink-950/5">
-                <button type="button" onClick={() => { setIsModalOpen(false); setEditingMember(null); resetForm(); }} className="rounded-lg px-4 py-2 text-sm font-bold text-ink-950/60 hover:bg-gray-100 transition-colors">Cancel</button>
-                <button type="submit" className="rounded-lg bg-gold-500 px-4 py-2 text-sm font-bold text-ink-950 hover:bg-gold-600 transition-colors">{editingMember ? "Update Member" : "Add Member"}</button>
+                <button type="button" onClick={() => { setEditingMember(null); resetForm(); }} className="rounded-lg px-4 py-2 text-sm font-bold text-ink-950/60 hover:bg-gray-100 transition-colors">Cancel</button>
+                <button type="submit" className="rounded-lg bg-gold-500 px-4 py-2 text-sm font-bold text-ink-950 hover:bg-gold-600 transition-colors">Update Member</button>
               </div>
             </form>
           </div>

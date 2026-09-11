@@ -1,3 +1,4 @@
+// src/pages/CheckIn.jsx
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CheckCircle2, Clock } from 'lucide-react';
@@ -5,14 +6,17 @@ import CheckInTabs from '../components/checkin/CheckInTabs';
 import MemberSearchList from '../components/checkin/MemberSearchList';
 import QRScanner from '../components/checkin/QRScanner';
 import MemberProfileModal from '../components/checkin/MemberProfileModal';
-import { MOCK_MEMBERS } from '../data/mockData';
+import { getAllMembers, saveMembers } from '../utils/memberStorage'; // <--- NEW
 
 const CheckIn = () => {
   const location = useLocation();
   
   const [activeTab, setActiveTab] = useState('manual');
   const [searchQuery, setSearchQuery] = useState('');
-  const [members, setMembers] = useState(MOCK_MEMBERS);
+  
+  // CHANGED: Load from localStorage instead of MOCK_MEMBERS
+  const [members, setMembers] = useState(() => getAllMembers());
+  
   const [recentLogs, setRecentLogs] = useState([
     { id: 1, name: 'Juan Dela Cruz', time: '7:45 AM', action: 'Checked In' },
   ]);
@@ -26,34 +30,61 @@ const CheckIn = () => {
   }, [location.state]);
 
   const handleCheckIn = (id) => {
-    setMembers(prev => prev.map(m => m.id === id ? { ...m, isInside: true } : m));
-    const member = members.find(m => m.id === id);
+    const updated = members.map(m => m.id === id ? { ...m, isInside: true } : m);
+    setMembers(updated);
+    saveMembers(updated); // <--- PERSIST to localStorage
+
+    const member = updated.find(m => m.id === id);
     if (member) {
       setRecentLogs(prev => [
-        { id: Date.now(), name: member.name, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Checked In' },
+        { 
+          id: Date.now(), 
+          name: member.name, 
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+          action: 'Checked In' 
+        },
         ...prev
       ]);
     }
   };
 
   const handleCheckOut = (id) => {
-    setMembers(prev => prev.map(m => m.id === id ? { ...m, isInside: false } : m));
-    const member = members.find(m => m.id === id);
+    const updated = members.map(m => m.id === id ? { ...m, isInside: false } : m);
+    setMembers(updated);
+    saveMembers(updated); // <--- PERSIST to localStorage
+
+    const member = updated.find(m => m.id === id);
     if (member) {
       setRecentLogs(prev => [
-        { id: Date.now(), name: member.name, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Checked Out' },
+        { 
+          id: Date.now(), 
+          name: member.name, 
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+          action: 'Checked Out' 
+        },
         ...prev
       ]);
     }
   };
 
+  // UPDATED: Now handles both "M-1234" and "1234" formats
   const handleScanSuccess = (decodedText) => {
-    const memberId = parseInt(decodedText.replace(/\D/g, '')); 
-    const member = members.find(m => m.id === memberId);
+    // Extract only digits from the QR code (works for "M-1234" or "1234")
+    const numericId = decodedText.replace(/\D/g, '');
+    
+    // Match against member's ID (also strips non-digits for comparison)
+    const member = members.find(m => {
+      const memberNumericId = String(m.id).replace(/\D/g, '');
+      return memberNumericId === numericId;
+    });
+
     if (member) {
       setSelectedMember(member);
     } else {
-      alert(`Member not found for QR code: ${decodedText}`);
+      alert(
+        `Member not found for QR code: ${decodedText}\n\n` +
+        `Make sure the member has been registered first.`
+      );
     }
   };
 
@@ -74,19 +105,12 @@ const CheckIn = () => {
 
   return (
     <>
-      {/* 
-        MOBILE FIX:
-        - Removed h-full on mobile (kept on desktop)
-        - Removed min-h-[500px] on mobile
-        - Changed gap-6 to gap-4 on mobile
-        - Made the card overflow visible so children can grow
-      */}
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 lg:h-full">
         
         {/* Main Check-in Card */}
         <div className="flex-1 rounded-2xl border border-ink-950/5 bg-white shadow-card lg:flex lg:flex-col lg:min-h-[500px] lg:overflow-hidden">
           
-          {/* Header - Hidden on mobile (Topbar already shows it) */}
+          {/* Header - Hidden on mobile */}
           <div className="hidden border-b border-ink-950/5 p-6 lg:block">
             <h2 className="text-xl font-bold text-ink-950">Check-in</h2>
             <p className="mt-1 text-sm text-ink-950/50">Scan or search a member to log today's visit.</p>
@@ -94,7 +118,6 @@ const CheckIn = () => {
 
           <CheckInTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
-          {/* Content Area */}
           <div className="flex-1 lg:overflow-hidden">
             {activeTab === 'manual' ? (
               <MemberSearchList 
@@ -107,7 +130,7 @@ const CheckIn = () => {
             ) : (
               <QRScanner 
                 onScanSuccess={handleScanSuccess} 
-                onScanFailure={(err) => { /* Silently handle */ }} 
+                onScanFailure={() => { /* Silently handle scan errors */ }} 
               />
             )}
           </div>

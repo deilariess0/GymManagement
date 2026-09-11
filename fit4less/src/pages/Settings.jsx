@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Save, MapPin, Phone, Clock, PhilippinePeso, Trash2 } from "lucide-react";
 import { cn } from "../utils/cn";
+import { resetMemberStorage } from "../utils/memberStorage"; // <--- NEW
 
 export default function Settings() {
   // Form State
@@ -36,25 +37,28 @@ export default function Settings() {
     alert("Settings saved successfully!");
   };
 
+  // UPDATED: Now actually resets localStorage and reloads
   const handleResetData = () => {
     if (confirm("Are you sure you want to reset all prototype data? This cannot be undone.")) {
-      alert("Demo data has been reset.");
+      resetMemberStorage();
+      alert("Demo data has been reset. The page will reload now.");
+      window.location.reload();
     }
   };
 
-  // Shared Input Class (Matches Check-in Search Bar)
+  // Shared Input Class
   const inputClass = "w-full min-h-[48px] rounded-xl border border-ink-950/10 bg-surface px-4 py-3 text-sm text-ink-950 outline-none transition-all focus:border-gold-500 focus:bg-white focus:ring-4 focus:ring-gold-500/15 placeholder:text-ink-950/30";
   
-  // Shared Card Class (Matches Dashboard/Payments)
+  // Shared Card Class
   const cardClass = "rounded-2xl bg-white p-5 shadow-card";
   
-  // Shared Label Class (Matches other forms)
+  // Shared Label Class
   const labelClass = "mb-1.5 block text-xs font-bold text-ink-950/70";
 
   return (
     <div className="space-y-5">
       
-      {/* Header (Matches other pages) */}
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-ink-950 md:text-2xl">Settings</h1>
@@ -70,10 +74,10 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         
-        {/* LEFT COLUMN: Main Config */}
+        {/* LEFT COLUMN */}
         <div className="lg:col-span-2 space-y-5">
           
-          {/* Gym Information Card */}
+          {/* Gym Information */}
           <div className={cardClass}>
             <h2 className="text-sm font-bold tracking-wide text-ink-950">GYM INFORMATION</h2>
             
@@ -110,7 +114,7 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Membership Rates Card */}
+          {/* Membership Rates */}
           <div className={cardClass}>
             <h2 className="text-sm font-bold tracking-wide text-ink-950">MEMBERSHIP RATES (₱)</h2>
             
@@ -148,21 +152,19 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Preferences & Danger Zone */}
+        {/* RIGHT COLUMN */}
         <div className="space-y-5">
           
-          {/* Preferences Card */}
+          {/* Preferences */}
           <div className={cardClass}>
             <h2 className="text-sm font-bold tracking-wide text-ink-950">PREFERENCES</h2>
             
             <div className="mt-4 space-y-5">
-              {/* Expiry Alert Days */}
               <div>
                 <label className={labelClass}>Expiry alert (days before)</label>
                 <input type="number" defaultValue="7" className={inputClass} />
               </div>
 
-              {/* Toggle: Expiring Notifications */}
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-ink-950">Expiring notifications</p>
@@ -183,11 +185,10 @@ export default function Settings() {
                 </button>
               </div>
 
-              {/* Toggle: Auto Check-out */}
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-ink-950">Auto check-out at closing</p>
-                  <p className="text-[10px] text-ink-950/45 mt-0.5">Everyone out at 10:00 PM</p>
+                  <p className="text-[10px] text-ink-950/45 mt-0.5">Everyone out at 9:00 PM</p>
                 </div>
                 <button
                   type="button"
@@ -206,11 +207,11 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Danger Zone Card */}
+          {/* Danger Zone */}
           <div className={cn(cardClass, "border border-rose-100")}>
             <h2 className="text-sm font-bold tracking-wide text-rose-500">DANGER ZONE</h2>
             <p className="mt-2 text-[11px] text-ink-950/45 leading-relaxed">
-              Clears all prototype data and restores the demo seed.
+              Clears all registered members and restores the original demo data.
             </p>
             <button
               onClick={handleResetData}
