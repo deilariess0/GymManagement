@@ -10,14 +10,12 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
 
   const qrCodeRegionId = "qr-reader";
 
-  // Detect if we're on an insecure connection (HTTP) on a non-localhost host
   const isInsecureContext = 
     typeof window !== 'undefined' &&
     window.location.protocol === 'http:' &&
     window.location.hostname !== 'localhost' &&
     window.location.hostname !== '127.0.0.1';
 
-  // iOS Safari fix: force playsinline & muted attributes on the video element
   const applyVideoAttributes = () => {
     const video = document.querySelector(`#${qrCodeRegionId} video`);
     if (video) {
@@ -26,9 +24,7 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
       video.setAttribute('muted', 'true');
       video.setAttribute('autoplay', 'true');
       video.muted = true;
-      video.play().catch(() => {
-        // Ignore play errors — some browsers reject due to autoplay policy
-      });
+      video.play().catch(() => {});
     }
   };
 
@@ -36,7 +32,6 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
     setError('');
     setIsScanning(true);
 
-    // CRITICAL iOS FIX: Wait a tick for the DOM to render `qr-reader` before starting
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     const html5QrCode = new Html5Qrcode(qrCodeRegionId);
@@ -70,10 +65,7 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
         }
       );
 
-      // Apply iOS video attributes right after the scanner starts
       applyVideoAttributes();
-      
-      // Retry after short delays in case the video element wasn't ready yet
       setTimeout(applyVideoAttributes, 300);
       setTimeout(applyVideoAttributes, 800);
 
@@ -116,62 +108,55 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center p-5 gap-4">
+    <div className="flex flex-col items-center gap-3 p-4">
       
       {/* Insecure Connection Warning */}
       {isInsecureContext && !isScanning && (
-        <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3 w-full max-w-[300px]">
-          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-amber-700 leading-relaxed">
-            Camera access requires a secure connection. Please use <strong>https://</strong> to scan QR codes on mobile.
+        <div className="flex w-full max-w-[280px] items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <AlertTriangle size={16} className="shrink-0 text-amber-600 mt-0.5" />
+          <p className="text-[11px] leading-relaxed text-amber-700">
+            Camera requires <strong>https://</strong> on mobile. Use "Simulate Scan" to test below.
           </p>
         </div>
       )}
 
-      {/* Scanner Container */}
-      <div className="relative w-full max-w-[300px] aspect-square rounded-3xl overflow-hidden bg-gray-900 border-2 border-gray-200">
-        
-        {/* 
-          CRITICAL iOS FIX: 
-          Explicit min-height prevents iOS Safari from collapsing the container to 0px
-          before the video is injected, which would break the scanner layout.
-        */}
+      {/* Scanner Container - Compact on Mobile */}
+      <div className="relative w-full max-w-[280px] overflow-hidden rounded-2xl border-2 border-gray-200 bg-gray-900">
         <div 
           id={qrCodeRegionId} 
-          className="w-full h-full object-cover"
-          style={{ minHeight: '300px' }}
+          className="h-[280px] w-full object-cover"
         ></div>
 
         {!isScanning && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/90 backdrop-blur-sm z-10">
-            <QrCode size={48} className="text-gray-400 mb-2" />
-            <p className="text-[11.5px] text-gray-500 text-center px-6 leading-relaxed font-medium">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-50/95 backdrop-blur-sm">
+            <QrCode size={40} className="mb-2 text-gray-400" />
+            <p className="px-6 text-center text-[11px] font-medium leading-relaxed text-gray-500">
               Align member's QR code within the frame to scan.
             </p>
           </div>
         )}
 
         {isScanning && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-            <div className="relative w-64 h-64 border-2 border-white/30 rounded-2xl">
-              <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-amber-400 rounded-tl-xl"></div>
-              <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-amber-400 rounded-tr-xl"></div>
-              <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-amber-400 rounded-bl-xl"></div>
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-amber-400 rounded-br-xl"></div>
-              
-              <div className="absolute left-2 right-2 h-0.5 bg-rose-500 rounded-full animate-scan shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <div className="relative h-[180px] w-[180px] rounded-2xl border-2 border-white/30">
+              <div className="absolute -left-1 -top-1 h-7 w-7 rounded-tl-xl border-l-4 border-t-4 border-amber-400"></div>
+              <div className="absolute -right-1 -top-1 h-7 w-7 rounded-tr-xl border-r-4 border-t-4 border-amber-400"></div>
+              <div className="absolute -bottom-1 -left-1 h-7 w-7 rounded-bl-xl border-b-4 border-l-4 border-amber-400"></div>
+              <div className="absolute -bottom-1 -right-1 h-7 w-7 rounded-br-xl border-b-4 border-r-4 border-amber-400"></div>
+              <div className="absolute left-2 right-2 h-0.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] animate-scan" />
             </div>
           </div>
         )}
       </div>
 
       {error && (
-        <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 px-3 py-2 rounded-lg w-full max-w-[300px]">
+        <p className="w-full max-w-[280px] rounded-lg bg-rose-50 px-3 py-2 text-center text-[11px] font-medium text-rose-500">
           {error}
         </p>
       )}
 
-      <div className="w-full max-w-[300px] flex flex-col gap-3 mt-2">
+      {/* Controls - Always Visible */}
+      <div className="flex w-full max-w-[280px] flex-col gap-2">
         {isScanning ? (
           <Button variant="secondary" onClick={stopScanner} className="w-full gap-2">
             <X size={18} />
@@ -186,7 +171,7 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
         
         <button 
           onClick={() => onScanSuccess && onScanSuccess("MEMBER-101")}
-          className="text-xs text-gray-400 underline hover:text-gray-600 transition-colors"
+          className="text-[11px] text-gray-400 underline transition-colors hover:text-gray-600"
         >
           Simulate Scan (Dev)
         </button>
