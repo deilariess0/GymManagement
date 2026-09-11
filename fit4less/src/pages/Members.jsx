@@ -123,15 +123,6 @@ export default function Members() {
   const closeProfile = () => setSelectedMember(null);
   const memberTransactions = selectedMember ? transactions.filter((txn) => txn.name === selectedMember.name) : [];
 
-  // Download the QR code of a member (called from the View modal)
-  const handleDownloadQR = (member) => {
-    if (!member?.qrValue) return alert("No QR code available for this member.");
-    
-    // Build a QR code dynamically using canvas
-    const { QRCodeSVG } = require("qrcode.react");
-    alert("QR download works from the registration page. Please scan the QR shown in the modal.");
-  };
-
   const PaginationBar = () => (
     <div className="mt-4 flex items-center justify-between border-t border-ink-950/5 pt-4">
       <button
@@ -281,8 +272,8 @@ export default function Members() {
                 </div>
 
                 <div className="mt-3 flex items-center gap-2">
-                  <button onClick={() => openEditModal(member)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold-500/15 px-3 py-2.5 text-xs font-bold text-gold-600 hover:bg-gold-500/25 transition-colors">
-                    <RefreshCw size={14} strokeWidth={2.5} /> Renew
+                  <button onClick={() => setSelectedMember(member)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-sky-100 px-3 py-2.5 text-xs font-bold text-sky-700 hover:bg-sky-200 transition-colors">
+                    <Eye size={14} strokeWidth={2.5} /> View
                   </button>
                   <button onClick={() => openEditModal(member)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ink-950/10 text-ink-950/60 hover:bg-gray-50 transition-colors">
                     <Pencil size={16} />
@@ -317,7 +308,7 @@ export default function Members() {
 
       {/* 
         ============================================================
-        MEMBER PROFILE MODAL (Landscape ID Card Style)
+        MEMBER PROFILE MODAL (Landscape ID Card - MOBILE OPTIMIZED)
         ============================================================
       */}
       {selectedMember && (
@@ -325,7 +316,7 @@ export default function Members() {
           <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl animate-slide-up sm:animate-fade-in">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-ink-950/5 p-5">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-950/5 bg-white p-5">
               <div>
                 <h3 className="text-base font-bold text-ink-950">Member Profile</h3>
                 <p className="text-[11px] text-ink-950/45">Landscape ID card preview</p>
@@ -357,10 +348,14 @@ export default function Members() {
                   </p>
                 </div>
 
-                {/* Card Body */}
+                {/* 
+                  Card Body
+                  - MOBILE: Stacked (info top, QR bottom)
+                  - DESKTOP: Side-by-side (info left, QR right)
+                */}
                 <div className="flex flex-col gap-5 bg-white p-5 sm:flex-row sm:items-center sm:gap-6">
                   
-                  {/* LEFT: Member Info */}
+                  {/* LEFT/TOP: Member Info */}
                   <div className="flex flex-1 items-center gap-4">
                     <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${getAvatarColor(selectedMember.name)} text-lg font-extrabold text-white`}>
                       {getInitials(selectedMember.name)}
@@ -396,17 +391,17 @@ export default function Members() {
                     </div>
                   </div>
 
-                  {/* Divider */}
+                  {/* Divider - only on desktop */}
                   <div className="hidden h-32 w-px bg-ink-950/10 sm:block" />
 
-                  {/* RIGHT: QR Code (only if qrValue exists) */}
+                  {/* RIGHT/BOTTOM: QR Code */}
                   {selectedMember.qrValue && (
-                    <div className="flex shrink-0 flex-col items-center justify-center gap-2">
+                    <div className="flex shrink-0 flex-col items-center justify-center gap-2 border-t border-dashed border-ink-950/10 pt-5 sm:border-0 sm:pt-0">
                       <div className="rounded-xl bg-white p-2 ring-1 ring-ink-950/5">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${selectedMember.qrValue}`}
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${selectedMember.qrValue}`}
                           alt={`QR Code for ${selectedMember.name}`}
-                          className="h-[120px] w-[120px]"
+                          className="h-[140px] w-[140px] sm:h-[120px] sm:w-[120px]"
                         />
                       </div>
                       <p className="text-[9px] font-bold uppercase tracking-widest text-ink-950/40">
@@ -436,7 +431,7 @@ export default function Members() {
                 </div>
               </div>
 
-              {/* Recent Transactions (kept below the card) */}
+              {/* Recent Transactions */}
               <div className="mt-5">
                 <h4 className="mb-2 text-sm font-bold text-ink-950">Recent Transactions</h4>
                 <div className="max-h-40 overflow-y-auto rounded-xl border border-ink-950/10">
