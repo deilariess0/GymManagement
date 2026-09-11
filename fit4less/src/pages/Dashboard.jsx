@@ -4,17 +4,14 @@ import StatCard from "../components/dashboard/StatCard";
 import TransactionsTable from "../components/dashboard/TransactionsTable";
 import TopMembers from "../components/dashboard/TopMembers";
 import QuickActions from "../components/dashboard/QuickActions";
-import { Users, Banknote, UserCheck, CalendarClock } from "lucide-react"; // Icons for cards
+import { Users, Banknote, UserCheck, CalendarClock } from "lucide-react";
 
 export default function Dashboard() {
-  // Pull live data from Context
   const { transactions } = useGym();
 
-  // Calculate dynamic values
   const todayVisits = transactions.length;
   const todayIncome = transactions.reduce((sum, t) => sum + t.amount, 0);
 
-  // Create the stats array dynamically (Calculated every render)
   const stats = [
     {
       id: "visits",
@@ -55,22 +52,37 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-4 md:space-y-5">
+      
+      {/* 
+        MOBILE-ONLY HEADING
+        Hidden on desktop (lg:hidden) because the Topbar already shows the title.
+        Visible only on mobile since the Topbar shows the FIT4LESS logo instead.
+      */}
+      <div className="lg:hidden">
+        <h1 className="text-xl font-extrabold tracking-tight text-ink-950">
+          Dashboard
+        </h1>
+        <p className="text-xs text-ink-950/50 mt-0.5">
+          Welcome back, Admin!
+        </p>
+      </div>
+
+      {/* Stat Cards: 2 columns on mobile, 4 on desktop */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {stats.map((stat) => (
           <StatCard key={stat.id} stat={stat} />
         ))}
       </div>
 
-      {/* Removed IncomeChart and MembershipBreakdown grid here */}
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        {/* TransactionsTable now spans 2 columns to fill the empty space left by the charts */}
+      <div className="grid grid-cols-1 gap-4 lg:gap-5 lg:grid-cols-3">
+        {/* TransactionsTable spans 2 columns on desktop, full width on mobile */}
         <div className="lg:col-span-2">
           <TransactionsTable />
         </div>
         
-        <div className="space-y-5">
+        {/* Right Sidebar: TopMembers and QuickActions */}
+        <div className="space-y-4 lg:space-y-5">
           <TopMembers />
           <QuickActions />
         </div>

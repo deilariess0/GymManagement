@@ -34,11 +34,6 @@ export default function Sidebar({ forceVisible = false, onClose, collapsed = fal
         <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden" onClick={onClose} />
       )}
 
-      {/* 
-         THE FIX:
-         - On Mobile: Hidden unless open, then fixed.
-         - On Desktop: ALWAYS `lg:static` and `lg:flex` so it takes up space and NEVER shifts.
-      */}
       <aside
         className={cn(
           "flex-col bg-ink-950 text-white transition-all duration-300",
@@ -47,7 +42,7 @@ export default function Sidebar({ forceVisible = false, onClose, collapsed = fal
           "lg:static lg:translate-x-0"
         )}
       >
-        {/* Logo / Brand */}
+        {/* Top Logo (Unchanged - Text Based) */}
         <div className="flex items-center gap-2.5 px-6 pb-6 pt-7">
           <img 
             src="/fit4less.jpg" 
@@ -125,14 +120,23 @@ export default function Sidebar({ forceVisible = false, onClose, collapsed = fal
           ))}
         </nav>
 
-        {/* Bottom Area */}
+        {/* ============================================
+            UPDATED BOTTOM SECTION (Matches Image 2)
+            ============================================ */}
         {!collapsed && (
-          <div className="px-4 pb-4">
-            <img 
-              src="/fit4.png" 
-              alt="FIT4LESS Management System" 
-              className="w-full rounded-xl object-contain bg-white/5 p-2"
-            />
+          <div className="px-4 pb-6 pt-4">
+            {/* Top border line */}
+            <div className="mb-5 h-px w-full bg-white/10" />
+            
+            {/* Text Branding */}
+            <div className="flex flex-col items-center justify-center text-center leading-tight">
+              <p className="text-[11px] font-bold tracking-[0.15em] text-white/40">
+                FIT<span className="text-gold-400">4</span>LESS
+              </p>
+              <p className="mt-1 text-[9px] font-semibold tracking-[0.2em] text-white/30">
+                MANAGEMENT SYSTEM
+              </p>
+            </div>
           </div>
         )}
       </aside>

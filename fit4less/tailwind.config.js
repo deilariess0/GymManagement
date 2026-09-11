@@ -26,8 +26,29 @@ export default {
       borderRadius: {
         xl2: "1.25rem",
       },
+      // --- ANIMATIONS FOR QR SCANNER, UI, AND MOBILE NAV ---
+      keyframes: {
+        scan: {
+          '0%, 100%': { top: '10%' },
+          '50%': { top: '90%' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        // ADDED: Slide-up animation for the mobile "More" menu
+        'slide-up': {
+          '0%': { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        scan: 'scan 2s ease-in-out infinite',
+        'fade-in': 'fade-in 0.2s ease-out',
+        // ADDED: Registered the slide-up animation
+        'slide-up': 'slide-up 0.3s ease-out',
+      },
     },
   },
   plugins: [],
 }
-

@@ -1,7 +1,7 @@
 // src/pages/Members.jsx
 import { useMemo, useState } from "react";
 import { useGym } from "../context/useGym";
-import { Plus, Search, UserX, Eye, X, Pencil, Filter, Download, Trash2, CheckSquare, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, UserX, Eye, X, Pencil, Filter, Download, Trash2, CheckSquare, ChevronLeft, ChevronRight, CalendarClock, RefreshCw } from "lucide-react";
 import { cn } from "../utils/cn";
 
 const MEMBERSHIP_PLANS = ["Weekly", "Monthly", "3 Months", "6 Months"];
@@ -72,9 +72,7 @@ export default function Members() {
     return filteredMembers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredMembers, currentPage]);
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-  };
+  const handlePageChange = (page) => setCurrentPage(page);
 
   // Bulk Selection Handlers
   const handleSelectAll = () => {
@@ -102,19 +100,23 @@ export default function Members() {
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];
   };
+
   const getStatusStyle = (status) => {
     switch (status) {
-      case "Active": return "bg-green-100 text-green-600";
-      case "Expiring Soon": return "bg-yellow-100 text-yellow-600";
-      case "Expired": return "bg-red-100 text-red-600";
+      case "Active": return "bg-emerald-100 text-emerald-700";
+      case "Expiring Soon": return "bg-amber-100 text-amber-700";
+      case "Expired": return "bg-rose-100 text-rose-700";
       default: return "bg-gray-100 text-gray-600";
     }
   };
 
+  // Generate a mock Member ID (e.g., M-0001)
+  const getMemberId = (id) => `M-${String(id).padStart(4, '0')}`;
+
   const closeProfile = () => setSelectedMember(null);
   const memberTransactions = selectedMember ? transactions.filter((txn) => txn.name === selectedMember.name) : [];
 
-  // Shared Pagination UI (Matches Dashboard/Payments)
+  // Shared Pagination UI
   const PaginationBar = () => (
     <div className="mt-4 flex items-center justify-between border-t border-ink-950/5 pt-4">
       <button
@@ -140,27 +142,40 @@ export default function Members() {
   );
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header & Button */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-ink-950 md:text-2xl">Members</h1>
           <p className="text-xs text-ink-950/45 md:text-sm">Manage active gym members.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-lg bg-gold-500 px-4 py-2 text-sm font-semibold text-ink-950 hover:bg-gold-600 sm:w-auto">
+        <button 
+          onClick={() => setIsModalOpen(true)} 
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 py-2.5 text-sm font-bold text-ink-950 transition-colors hover:bg-gold-600 sm:w-auto"
+        >
           <Plus size={18} strokeWidth={3} /> Add Member
         </button>
       </div>
 
-      {/* Search & Filter (Stack on Mobile) */}
-      <div className="mb-4 flex flex-col gap-3 md:flex-row">
-        <div className="flex flex-1 items-center gap-2 rounded-xl border border-ink-950/10 bg-white px-3 py-2.5 shadow-sm">
-          <Search size={18} className="text-ink-950/35" />
-          <input type="text" placeholder="Search members..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full flex-1 bg-transparent text-sm outline-none" />
+      {/* Search & Filter */}
+      <div className="flex flex-col gap-3 md:flex-row">
+        <div className="relative flex flex-1 items-center">
+          <Search className="absolute left-3 text-ink-950/30" size={18} strokeWidth={2.25} />
+          <input 
+            type="text" 
+            placeholder="Search members..." 
+            value={searchTerm} 
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
+            className="w-full min-h-[48px] pl-10 pr-4 border border-ink-950/10 rounded-xl bg-surface text-sm text-ink-950 outline-none focus:bg-white focus:border-gold-500 focus:ring-4 focus:ring-gold-500/15 transition-all placeholder:text-ink-950/30"
+          />
         </div>
         <div className="relative md:w-auto">
           <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-950/40" />
-          <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setCurrentPage(1); }} className="w-full appearance-none rounded-xl border border-ink-950/10 bg-white py-2.5 pl-9 pr-8 text-sm font-semibold shadow-sm outline-none md:w-auto">
+          <select 
+            value={planFilter} 
+            onChange={(e) => { setPlanFilter(e.target.value); setCurrentPage(1); }} 
+            className="w-full appearance-none min-h-[48px] rounded-xl border border-ink-950/10 bg-surface py-2.5 pl-9 pr-8 text-sm font-semibold text-ink-950 shadow-sm outline-none focus:border-gold-500 focus:ring-4 focus:ring-gold-500/15 transition-all md:w-auto"
+          >
             <option value="All">All Plans</option>
             {MEMBERSHIP_PLANS.map(plan => <option key={plan} value={plan}>{plan}</option>)}
           </select>
@@ -170,9 +185,9 @@ export default function Members() {
       {/* Desktop Table */}
       <div className="hidden overflow-hidden rounded-2xl bg-white shadow-card md:block">
         <table className="w-full text-left">
-          <thead className="border-b border-ink-950/5 text-xs font-semibold uppercase text-ink-950/35">
+          <thead className="border-b border-ink-950/5 text-xs font-bold uppercase tracking-wide text-ink-950/35">
             <tr>
-              <th className="p-4"><input type="checkbox" checked={selectedIds.length === paginatedMembers.length && paginatedMembers.length > 0} onChange={handleSelectAll} className="h-4 w-4" /></th>
+              <th className="p-4"><input type="checkbox" checked={selectedIds.length === paginatedMembers.length && paginatedMembers.length > 0} onChange={handleSelectAll} className="h-4 w-4 rounded border-ink-950/20 text-gold-500 focus:ring-gold-500" /></th>
               <th className="p-4">Member Name</th>
               <th className="p-4">Type</th>
               <th className="p-4">Plan</th>
@@ -186,25 +201,25 @@ export default function Members() {
             {paginatedMembers.map((member) => {
               const displayAmount = member.amount > 0 ? member.amount : getPrice(member.type, member.plan);
               return (
-                <tr key={member.id} className={cn("hover:bg-gray-50", selectedIds.includes(member.id) && "bg-gold-500/5")}>
-                  <td className="p-4"><input type="checkbox" checked={selectedIds.includes(member.id)} onChange={() => handleSelectOne(member.id)} className="h-4 w-4" /></td>
+                <tr key={member.id} className={cn("hover:bg-gold-500/5 transition-colors", selectedIds.includes(member.id) && "bg-gold-500/5")}>
+                  <td className="p-4"><input type="checkbox" checked={selectedIds.includes(member.id)} onChange={() => handleSelectOne(member.id)} className="h-4 w-4 rounded border-ink-950/20 text-gold-500 focus:ring-gold-500" /></td>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${getAvatarColor(member.name)} text-xs font-bold text-white`}>{getInitials(member.name)}</div>
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-full ${getAvatarColor(member.name)} text-xs font-bold text-white shrink-0`}>{getInitials(member.name)}</div>
                       <span className="font-semibold text-ink-950">{member.name}</span>
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", member.type === "Student" ? "bg-pink-100 text-pink-600" : "bg-orange-100 text-orange-600")}>{member.type}</span>
+                    <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", member.type === "Student" ? "bg-pink-100 text-pink-700" : "bg-orange-100 text-orange-700")}>{member.type}</span>
                   </td>
-                  <td className="p-4 text-ink-950/70">{member.plan}</td>
-                  <td className="p-4 text-xs text-ink-950/70">{member.startDate} to {member.endDate}</td>
-                  <td className="p-4 font-semibold text-ink-950">P{displayAmount.toFixed(2)}</td>
-                  <td className="p-4"><span className={cn("rounded-full px-2 py-1 text-xs font-medium", getStatusStyle(member.status))}>{member.status}</span></td>
+                  <td className="p-4 text-sm font-medium text-ink-950/70">{member.plan}</td>
+                  <td className="p-4 text-xs text-ink-950/60">{member.startDate} to {member.endDate}</td>
+                  <td className="p-4 font-bold text-ink-950">₱{displayAmount.toFixed(2)}</td>
+                  <td className="p-4"><span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", getStatusStyle(member.status))}>{member.status}</span></td>
                   <td className="p-4">
                     <div className="flex gap-2">
-                      <button onClick={() => setSelectedMember(member)} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100"><Eye size={14} /> View</button>
-                      <button onClick={() => openEditModal(member)} className="flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-xs font-semibold text-green-600 hover:bg-green-100"><Pencil size={14} /> Edit</button>
+                      <button onClick={() => setSelectedMember(member)} className="flex items-center gap-1 rounded-lg bg-sky-100 px-2.5 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-200 transition-colors"><Eye size={14} /> View</button>
+                      <button onClick={() => openEditModal(member)} className="flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 transition-colors"><Pencil size={14} /> Edit</button>
                     </div>
                   </td>
                 </tr>
@@ -220,37 +235,58 @@ export default function Members() {
         </div>
       </div>
 
-      {/* Mobile Cards */}
+      {/* Mobile Cards - Matching the 3rd image style */}
       <div className="space-y-3 md:hidden">
         {paginatedMembers.length > 0 ? (
           paginatedMembers.map((member) => {
             const displayAmount = member.amount > 0 ? member.amount : getPrice(member.type, member.plan);
             return (
-              <div key={member.id} className={cn("rounded-2xl bg-white p-4 shadow-card", selectedIds.includes(member.id) && "border-2 border-gold-500")}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <input type="checkbox" checked={selectedIds.includes(member.id)} onChange={() => handleSelectOne(member.id)} className="h-4 w-4" />
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${getAvatarColor(member.name)} text-sm font-bold text-white`}>{getInitials(member.name)}</div>
-                    <div>
-                      <p className="font-semibold text-ink-950">{member.name}</p>
-                      <p className="text-xs text-ink-950/50">{member.plan}</p>
+              <div key={member.id} className={cn("rounded-2xl bg-white p-4 shadow-card border border-ink-950/5", selectedIds.includes(member.id) && "border-2 border-gold-500")}>
+                
+                {/* Header: Avatar + Name + ID + Plan + Status */}
+                <div className="flex items-start gap-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${getAvatarColor(member.name)} text-xs font-bold text-white shrink-0`}>
+                    {getInitials(member.name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-ink-950 truncate">{member.name}</h4>
+                      <span className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0", getStatusStyle(member.status))}>
+                        {member.status}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[10px] font-medium text-ink-950/50">
+                      <span>{getMemberId(member.id)}</span>
+                      <span>•</span>
+                      <span className={cn("rounded px-1.5 py-0.5 font-bold", member.type === "Student" ? "bg-pink-100 text-pink-700" : "bg-orange-100 text-orange-700")}>{member.type}</span>
+                      <span>•</span>
+                      <span>{member.plan}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1"><CalendarClock size={10} /> exp {member.endDate}</span>
                     </div>
                   </div>
-                  <span className={cn("rounded-full px-2 py-1 text-[10px] font-medium", getStatusStyle(member.status))}>{member.status}</span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <span className={cn("rounded-full px-2 py-1 font-medium", member.type === "Student" ? "bg-pink-100 text-pink-600" : "bg-orange-100 text-orange-600")}>{member.type}</span>
-                  <span className="rounded-full bg-gray-100 px-2 py-1 text-gray-600">{member.startDate} to {member.endDate}</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-ink-950/5 pt-3">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase text-ink-950/40">Amount</p>
-                    <p className="text-lg font-extrabold text-ink-950">P{displayAmount.toFixed(2)}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setSelectedMember(member)} className="flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600"><Eye size={14} /> View</button>
-                    <button onClick={() => openEditModal(member)} className="flex items-center gap-1 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-600"><Pencil size={14} /> Edit</button>
-                  </div>
+
+                {/* Action Row: Renew + Edit + Delete */}
+                <div className="mt-3 flex items-center gap-2">
+                  <button 
+                    onClick={() => openEditModal(member)} 
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold-500/15 px-3 py-2.5 text-xs font-bold text-gold-600 hover:bg-gold-500/25 transition-colors"
+                  >
+                    <RefreshCw size={14} strokeWidth={2.5} /> Renew
+                  </button>
+                  <button 
+                    onClick={() => openEditModal(member)} 
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ink-950/10 text-ink-950/60 hover:bg-gray-50 transition-colors"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleSelectOne(member.id)} 
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             );
@@ -259,7 +295,6 @@ export default function Members() {
           <div className="rounded-2xl bg-white p-10 text-center text-ink-950/40 shadow-card"><UserX className="mx-auto mb-2" size={30} /> No members found.</div>
         )}
         
-        {/* Mobile Pagination Bar (Always Visible) */}
         <div className="rounded-2xl bg-white p-4 shadow-card">
           <PaginationBar />
         </div>
@@ -270,92 +305,100 @@ export default function Members() {
         <div className="fixed bottom-6 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between rounded-2xl bg-ink-950 p-4 text-white shadow-2xl">
           <div className="flex items-center gap-2"><CheckSquare size={18} className="text-gold-500" /><span className="text-sm font-bold">{selectedIds.length} Selected</span></div>
           <div className="flex gap-2">
-            <button onClick={handleBulkExport} className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><Download size={14} /> Export</button>
-            <button onClick={handleBulkDelete} className="flex items-center gap-1 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/30"><Trash2 size={14} /> Delete</button>
-            <button onClick={() => setSelectedIds([])} className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><X size={14} /> Clear</button>
+            <button onClick={handleBulkExport} className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20 transition-colors"><Download size={14} /> Export</button>
+            <button onClick={handleBulkDelete} className="flex items-center gap-1 rounded-lg bg-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/30 transition-colors"><Trash2 size={14} /> Delete</button>
+            <button onClick={() => setSelectedIds([])} className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20 transition-colors"><X size={14} /> Clear</button>
           </div>
         </div>
       )}
 
       {/* Profile Modal */}
       {selectedMember && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
-            <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold text-ink-950">Member Profile</h3><button onClick={closeProfile} className="text-ink-950/50 hover:text-ink-950"><X size={20} /></button></div>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 backdrop-blur-sm sm:items-center animate-fade-in">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6 animate-fade-in">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-ink-950">Member Profile</h3>
+              <button onClick={closeProfile} className="rounded-full p-1 text-ink-950/50 hover:bg-gray-100 hover:text-ink-950 transition-colors"><X size={20} /></button>
+            </div>
+            
             <div className="mb-4 flex items-center gap-3">
-              <div className={`flex h-16 w-16 items-center justify-center rounded-full ${getAvatarColor(selectedMember.name)} text-xl font-bold text-white`}>{getInitials(selectedMember.name)}</div>
+              <div className={`flex h-16 w-16 items-center justify-center rounded-full ${getAvatarColor(selectedMember.name)} text-xl font-bold text-white shrink-0`}>{getInitials(selectedMember.name)}</div>
               <div>
                 <h4 className="text-xl font-bold text-ink-950">{selectedMember.name}</h4>
                 <div className="mt-1 flex gap-2">
-                  <span className={cn("rounded-full px-2 py-1 text-xs font-medium", selectedMember.type === "Student" ? "bg-pink-100 text-pink-600" : "bg-orange-100 text-orange-600")}>{selectedMember.type}</span>
-                  <span className={cn("rounded-full px-2 py-1 text-xs font-medium", getStatusStyle(selectedMember.status))}>{selectedMember.status}</span>
+                  <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", selectedMember.type === "Student" ? "bg-pink-100 text-pink-700" : "bg-orange-100 text-orange-700")}>{selectedMember.type}</span>
+                  <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", getStatusStyle(selectedMember.status))}>{selectedMember.status}</span>
                 </div>
               </div>
             </div>
-            <div className="mb-4 grid grid-cols-2 gap-4">
-              <div className="rounded-xl bg-ink-950/5 p-3"><p className="text-xs text-ink-950/45">Plan</p><p className="text-sm font-bold text-ink-950">{selectedMember.plan}</p></div>
-              <div className="rounded-xl bg-ink-950/5 p-3"><p className="text-xs text-ink-950/45">Total Paid</p><p className="text-sm font-bold text-ink-950">P{(selectedMember.amount > 0 ? selectedMember.amount : getPrice(selectedMember.type, selectedMember.plan)).toFixed(2)}</p></div>
-              <div className="rounded-xl bg-ink-950/5 p-3"><p className="text-xs text-ink-950/45">Start Date</p><p className="text-sm font-bold text-ink-950">{selectedMember.startDate}</p></div>
-              <div className="rounded-xl bg-ink-950/5 p-3"><p className="text-xs text-ink-950/45">End Date</p><p className="text-sm font-bold text-ink-950">{selectedMember.endDate}</p></div>
+
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Plan</p><p className="text-sm font-bold text-ink-950">{selectedMember.plan}</p></div>
+              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Total Paid</p><p className="text-sm font-bold text-ink-950">₱{(selectedMember.amount > 0 ? selectedMember.amount : getPrice(selectedMember.type, selectedMember.plan)).toFixed(2)}</p></div>
+              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Start Date</p><p className="text-sm font-bold text-ink-950">{selectedMember.startDate}</p></div>
+              <div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">End Date</p><p className="text-sm font-bold text-ink-950">{selectedMember.endDate}</p></div>
             </div>
+
             <div className="mb-4">
               <h4 className="mb-2 text-sm font-bold text-ink-950">Recent Transactions</h4>
               <div className="max-h-40 overflow-y-auto rounded-xl border border-ink-950/10">
                 <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-gray-50 text-xs uppercase text-ink-950/45"><tr><th className="p-2">Time</th><th className="p-2">Plan</th><th className="p-2">Amount</th><th className="p-2">Payment</th></tr></thead>
+                  <thead className="sticky top-0 bg-surface text-[10px] font-bold uppercase tracking-wide text-ink-950/45"><tr><th className="p-2.5">Time</th><th className="p-2.5">Plan</th><th className="p-2.5">Amount</th><th className="p-2.5">Payment</th></tr></thead>
                   <tbody>
                     {memberTransactions.length > 0 ? memberTransactions.map((txn) => (
                       <tr key={txn.id} className="border-b border-ink-950/5 last:border-0">
-                        <td className="p-2 text-ink-950/70">{txn.time}</td>
-                        <td className="p-2 text-ink-950/70">{txn.plan}</td>
-                        <td className="p-2 font-semibold text-ink-950">{txn.amount}</td>
-                        <td className="p-2 text-ink-950/70">{txn.payment}</td>
+                        <td className="p-2.5 text-ink-950/70">{txn.time}</td>
+                        <td className="p-2.5 text-ink-950/70">{txn.plan}</td>
+                        <td className="p-2.5 font-semibold text-ink-950">₱{txn.amount}</td>
+                        <td className="p-2.5 text-ink-950/70">{txn.payment}</td>
                       </tr>
                     )) : (<tr><td colSpan="4" className="p-4 text-center text-ink-950/40">No transactions yet.</td></tr>)}
                   </tbody>
                 </table>
               </div>
             </div>
-            <div className="flex justify-end"><button onClick={closeProfile} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-ink-950/60 hover:bg-gray-200">Close</button></div>
+
+            <div className="flex justify-end"><button onClick={closeProfile} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-bold text-ink-950/60 hover:bg-gray-200 transition-colors">Close</button></div>
           </div>
         </div>
       )}
 
       {/* Add / Edit Modals */}
       {(isModalOpen || editingMember) && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 backdrop-blur-sm sm:items-center animate-fade-in">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6 animate-fade-in">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-ink-950">{editingMember ? "Edit Member" : "Add New Member"}</h3>
-              <button onClick={() => { setIsModalOpen(false); setEditingMember(null); resetForm(); }} className="text-ink-950/50 hover:text-ink-950"><X size={20} /></button>
+              <button onClick={() => { setIsModalOpen(false); setEditingMember(null); resetForm(); }} className="rounded-full p-1 text-ink-950/50 hover:bg-gray-100 hover:text-ink-950 transition-colors"><X size={20} /></button>
             </div>
+            
             <form onSubmit={editingMember ? handleUpdateMember : handleAddMember} className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-ink-950/70">Member Name</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="e.g., Maria Santos" className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
+                <label className="mb-1 block text-xs font-bold text-ink-950/70">Member Name</label>
+                <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="e.g., Maria Santos" className="w-full rounded-lg border border-ink-950/10 px-3 py-2.5 text-sm focus:border-gold-500 focus:ring-4 focus:ring-gold-500/15 focus:outline-none transition-all" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-ink-950/70">Type</label>
-                  <select name="type" value={formData.type} onChange={handleChange} className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none">
+                  <label className="mb-1 block text-xs font-bold text-ink-950/70">Type</label>
+                  <select name="type" value={formData.type} onChange={handleChange} className="w-full rounded-lg border border-ink-950/10 px-3 py-2.5 text-sm focus:border-gold-500 focus:ring-4 focus:ring-gold-500/15 focus:outline-none transition-all">
                     <option value="Regular">Regular</option>
                     <option value="Student">Student</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-ink-950/70">Plan</label>
-                  <select name="plan" value={formData.plan} onChange={handleChange} className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none">
+                  <label className="mb-1 block text-xs font-bold text-ink-950/70">Plan</label>
+                  <select name="plan" value={formData.plan} onChange={handleChange} className="w-full rounded-lg border border-ink-950/10 px-3 py-2.5 text-sm focus:border-gold-500 focus:ring-4 focus:ring-gold-500/15 focus:outline-none transition-all">
                     {MEMBERSHIP_PLANS.map((plan) => <option key={plan} value={plan}>{plan}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-ink-950/70">Amount</label>
-                <input type="number" name="amount" value={formData.amount} readOnly className="w-full rounded-lg border border-ink-950/10 bg-gray-50 px-3 py-2 text-sm font-bold text-ink-950 focus:outline-none" />
+                <label className="mb-1 block text-xs font-bold text-ink-950/70">Amount</label>
+                <input type="number" name="amount" value={formData.amount} readOnly className="w-full rounded-lg border border-ink-950/10 bg-surface px-3 py-2.5 text-sm font-bold text-ink-950 focus:outline-none" />
               </div>
-              <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => { setIsModalOpen(false); setEditingMember(null); resetForm(); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-ink-950/60 hover:bg-gray-100">Cancel</button>
-                <button type="submit" className="rounded-lg bg-gold-500 px-4 py-2 text-sm font-bold text-ink-950 hover:bg-gold-600">{editingMember ? "Update Member" : "Add Member"}</button>
+              <div className="flex justify-end gap-3 pt-4 border-t border-ink-950/5">
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingMember(null); resetForm(); }} className="rounded-lg px-4 py-2 text-sm font-bold text-ink-950/60 hover:bg-gray-100 transition-colors">Cancel</button>
+                <button type="submit" className="rounded-lg bg-gold-500 px-4 py-2 text-sm font-bold text-ink-950 hover:bg-gold-600 transition-colors">{editingMember ? "Update Member" : "Add Member"}</button>
               </div>
             </form>
           </div>

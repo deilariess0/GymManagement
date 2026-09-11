@@ -8,7 +8,8 @@ import { cn } from "../../utils/cn";
 const MEMBER_TYPE_TONE = { Regular: "bg-orange-100 text-orange-600", Student: "bg-pink-100 text-pink-600" };
 const PAYMENT_TONE = { Cash: "bg-purple-100 text-purple-600", GCash: "bg-teal-100 text-teal-600", Maya: "bg-indigo-100 text-indigo-600" };
 
-export default function TransactionsTable() {
+// 1. ADDED searchQuery PROP
+export default function TransactionsTable({ searchQuery = "" }) {
   const navigate = useNavigate(); 
 
   const { transactions, members, addTransaction, getPrice } = useGym();
@@ -40,13 +41,26 @@ export default function TransactionsTable() {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // Calculate pagination data
-  const totalPages = Math.ceil(transactions.length / itemsPerPage);
+  // 2. ADDED FILTER LOGIC
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery) return transactions;
+    return transactions.filter((t) =>
+      t.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [transactions, searchQuery]);
+
+  // 3. UPDATED PAGINATION TO USE FILTERED DATA
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   
   const paginatedTransactions = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return transactions.slice(startIndex, startIndex + itemsPerPage);
-  }, [transactions, currentPage]);
+    return filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredTransactions, currentPage]);
+
+  // 4. RESET PAGE TO 1 WHEN SEARCHING
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   // Create placeholders to ensure the table always has 9 rows
   const displayRows = useMemo(() => {
