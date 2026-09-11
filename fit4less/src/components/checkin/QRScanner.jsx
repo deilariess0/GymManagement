@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { QrCode, Camera, X } from 'lucide-react';
+import { QrCode, Camera, X, AlertTriangle } from 'lucide-react';
 import Button from '../ui/Button';
 
 const QRScanner = ({ onScanSuccess, onScanFailure }) => {
@@ -10,23 +10,46 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
 
   const qrCodeRegionId = "qr-reader";
 
+  // Detect if we're on an insecure connection (HTTP) on a non-localhost host
+  const isInsecureContext = 
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'http:' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1';
+
+  // iOS Safari fix: force playsinline & muted attributes on the video element
+  const applyVideoAttributes = () => {
+    const video = document.querySelector(`#${qrCodeRegionId} video`);
+    if (video) {
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      video.setAttribute('muted', 'true');
+      video.setAttribute('autoplay', 'true');
+      video.muted = true;
+      video.play().catch(() => {
+        // Ignore play errors — some browsers reject due to autoplay policy
+      });
+    }
+  };
+
   const startScanner = async () => {
     setError('');
     setIsScanning(true);
-    
+
+    // CRITICAL iOS FIX: Wait a tick for the DOM to render `qr-reader` before starting
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
     const html5QrCode = new Html5Qrcode(qrCodeRegionId);
     scannerRef.current = html5QrCode;
 
     const config = {
       fps: 10,
-      // IMPROVED: Responsive qrbox size for mobile
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-        const qrboxSize = Math.floor(minEdge * 0.7); // 70% of smaller dimension
+        const qrboxSize = Math.floor(minEdge * 0.7);
         return { width: qrboxSize, height: qrboxSize };
       },
       aspectRatio: 1.0,
-      // ADDED: Prefer back camera and specify resolution
       videoConstraints: {
         facingMode: { ideal: "environment" },
         width: { ideal: 1280 },
@@ -36,7 +59,6 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
 
     try {
       await html5QrCode.start(
-        // CHANGED: Use specific camera constraints object
         { facingMode: "environment" },
         config,
         (decodedText) => {
@@ -47,17 +69,26 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
           if (onScanFailure) onScanFailure(errorMessage);
         }
       );
+
+      // Apply iOS video attributes right after the scanner starts
+      applyVideoAttributes();
+      
+      // Retry after short delays in case the video element wasn't ready yet
+      setTimeout(applyVideoAttributes, 300);
+      setTimeout(applyVideoAttributes, 800);
+
     } catch (err) {
       console.error("Error starting scanner:", err);
       
-      // IMPROVED: More specific error messages
       let errorMsg = "Could not access camera.";
-      if (err.name === 'NotAllowedError') {
-        errorMsg = "Camera permission denied. Please allow access in your browser settings.";
+      if (err.name === 'NotAllowedError' || err.message?.includes('Permission')) {
+        errorMsg = "Camera permission denied. Please allow camera access in your browser settings.";
       } else if (err.name === 'NotFoundError') {
         errorMsg = "No camera found on this device.";
       } else if (err.name === 'NotReadableError') {
         errorMsg = "Camera is already in use by another app.";
+      } else if (isInsecureContext) {
+        errorMsg = "Camera requires HTTPS. Please use a secure connection (https://).";
       }
       
       setError(errorMsg);
@@ -86,10 +117,30 @@ const QRScanner = ({ onScanSuccess, onScanFailure }) => {
 
   return (
     <div className="flex flex-col items-center p-5 gap-4">
+      
+      {/* Insecure Connection Warning */}
+      {isInsecureContext && !isScanning && (
+        <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3 w-full max-w-[300px]">
+          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-[11px] text-amber-700 leading-relaxed">
+            Camera access requires a secure connection. Please use <strong>https://</strong> to scan QR codes on mobile.
+          </p>
+        </div>
+      )}
+
       {/* Scanner Container */}
       <div className="relative w-full max-w-[300px] aspect-square rounded-3xl overflow-hidden bg-gray-900 border-2 border-gray-200">
         
-        <div id={qrCodeRegionId} className="w-full h-full object-cover"></div>
+        {/* 
+          CRITICAL iOS FIX: 
+          Explicit min-height prevents iOS Safari from collapsing the container to 0px
+          before the video is injected, which would break the scanner layout.
+        */}
+        <div 
+          id={qrCodeRegionId} 
+          className="w-full h-full object-cover"
+          style={{ minHeight: '300px' }}
+        ></div>
 
         {!isScanning && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/90 backdrop-blur-sm z-10">
