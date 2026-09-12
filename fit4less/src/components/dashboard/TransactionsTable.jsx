@@ -1,29 +1,51 @@
 // src/components/dashboard/TransactionsTable.jsx
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom"; 
-import { Plus, ArrowRight, X, ChevronLeft, ChevronRight, User, CalendarClock, CheckCircle } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react"; // <-- NEW
+import {
+  Plus,
+  ArrowRight,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  CalendarClock,
+  CheckCircle,
+  AlertTriangle,
+  Dumbbell,
+  Fingerprint,
+} from "lucide-react";
 import { useGym } from "../../context/useGym";
+import { getAllMembers } from "../../utils/memberStorage";
 import { cn } from "../../utils/cn";
 
-const MEMBER_TYPE_TONE = { Regular: "bg-orange-100 text-orange-600", Student: "bg-pink-100 text-pink-600" };
-const PAYMENT_TONE = { Cash: "bg-purple-100 text-purple-600", GCash: "bg-teal-100 text-teal-600", Maya: "bg-indigo-100 text-indigo-600" };
+const MEMBER_TYPE_TONE = {
+  Regular: "bg-orange-100 text-orange-600",
+  Student: "bg-pink-100 text-pink-600",
+};
 
-// 1. ADDED searchQuery PROP
+const PAYMENT_TONE = {
+  Cash: "bg-purple-100 text-purple-600",
+  GCash: "bg-teal-100 text-teal-600",
+  Maya: "bg-indigo-100 text-indigo-600",
+};
+
 export default function TransactionsTable({ searchQuery = "" }) {
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  const { transactions, addTransaction, getPrice } = useGym();
 
-  const { transactions, members, addTransaction, getPrice } = useGym();
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 9; 
+  const itemsPerPage = 9;
 
   const [transactionType, setTransactionType] = useState("daily");
+  const [memberWarning, setMemberWarning] = useState("");
+  const [matchedMember, setMatchedMember] = useState(null);
 
   const [formData, setFormData] = useState({
     name: "",
     type: "Regular",
-    plan: "Daily", 
+    plan: "Daily",
     discount: "",
     amount: "80",
     payment: "Cash",
@@ -32,16 +54,21 @@ export default function TransactionsTable({ searchQuery = "" }) {
 
   const MEMBERSHIP_PLANS = ["Weekly", "Monthly", "3 Months", "6 Months"];
 
-  // UI Helpers
-  const getInitials = (name) => name.split(" ").map(n => n[0]).join("").toUpperCase();
+  // --- UI Helpers ---
+  const getInitials = (name) =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2);
+
   const getAvatarColor = (name) => {
-    const colors = ["bg-orange-500", "bg-pink-500", "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500"];
+    const colors = [
+      "bg-orange-500", "bg-pink-500", "bg-blue-500",
+      "bg-green-500", "bg-purple-500", "bg-yellow-500",
+    ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // 2. ADDED FILTER LOGIC
+  // --- Filtering ---
   const filteredTransactions = useMemo(() => {
     if (!searchQuery) return transactions;
     return transactions.filter((t) =>
@@ -49,20 +76,17 @@ export default function TransactionsTable({ searchQuery = "" }) {
     );
   }, [transactions, searchQuery]);
 
-  // 3. UPDATED PAGINATION TO USE FILTERED DATA
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  
+
   const paginatedTransactions = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredTransactions, currentPage]);
 
-  // 4. RESET PAGE TO 1 WHEN SEARCHING
   useMemo(() => {
     setCurrentPage(1);
   }, [searchQuery]);
 
-  // Create placeholders to ensure the table always has 9 rows
   const displayRows = useMemo(() => {
     const rows = [...paginatedTransactions];
     while (rows.length < itemsPerPage) {
@@ -71,24 +95,72 @@ export default function TransactionsTable({ searchQuery = "" }) {
     return rows;
   }, [paginatedTransactions]);
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
+  const handlePageChange = (page) => setCurrentPage(page);
+
+  // --- Member Lookup ---
+  const findMemberByName = (name) => {
+    const allMembers = getAllMembers();
+    return allMembers.find(
+      (m) => m.name.toLowerCase() === name.toLowerCase().trim()
+    );
+  };
+
+  // --- Live Lookup (as user types) ---
+  useEffect(() => {
+    if (transactionType !== "plan") return;
+
+    const trimmed = formData.name.trim();
+    if (!trimmed) {
+      setMatchedMember(null);
+      setMemberWarning("");
+      return;
+    }
+
+    const found = findMemberByName(trimmed);
+    if (found) {
+      setMatchedMember(found);
+      setMemberWarning("");
+    } else {
+      setMatchedMember(null);
+      setMemberWarning(
+        `"${trimmed}" is not a registered member. Please register this person first.`
+      );
+    }
+  }, [formData.name, transactionType]);
+
+  // --- Reset helper ---
+  const resetFormState = () => {
+    setFormData({
+      name: "",
+      type: "Regular",
+      plan: "Daily",
+      discount: "",
+      amount: "80",
+      payment: "Cash",
+      status: "Paid",
+    });
+    setMatchedMember(null);
+    setMemberWarning("");
+  };
+
+  // --- Tab Switch ---
+  const handleTabSwitch = (type) => {
+    if (type === transactionType) return;
+    setTransactionType(type);
+    resetFormState();
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     setFormData((prev) => {
       const nextData = { ...prev, [name]: value };
 
       if (transactionType === "plan" && name === "name") {
-        const existingMember = members.find(
-          (m) => m.name.toLowerCase() === value.toLowerCase()
-        );
-        
-        if (existingMember) {
-          nextData.type = existingMember.type;
-          nextData.plan = existingMember.plan;
+        const existing = findMemberByName(value);
+        if (existing) {
+          nextData.type = existing.type;
+          nextData.plan = existing.plan;
         }
       }
 
@@ -96,35 +168,55 @@ export default function TransactionsTable({ searchQuery = "" }) {
         const price = getPrice(nextData.type, "Daily");
         nextData.amount = price.toString();
       }
-      
+
       return nextData;
     });
   };
 
   const handleAddTransaction = (e) => {
     e.preventDefault();
-    
-    if (!formData.name) {
+
+    if (!formData.name.trim()) {
       alert("Please enter a member name.");
       return;
     }
 
-    if (transactionType === "plan") {
-      const finalData = { ...formData, amount: "0", status: "Checked In" };
-      addTransaction(finalData); 
-    } else {
-      addTransaction(formData); 
+    const existing = findMemberByName(formData.name);
+
+    if (!existing) {
+      setMemberWarning(
+        `"${formData.name}" is not a registered member. Please register this person first.`
+      );
+      return;
     }
 
-    setFormData({ name: "", type: "Regular", plan: "Daily", discount: "", amount: "80", payment: "Cash", status: "Paid" });
+    const finalData = {
+      ...formData,
+      name: existing.name,
+      type: existing.type,
+      plan: transactionType === "plan" ? existing.plan : formData.plan,
+      status: transactionType === "plan" ? "Checked In" : "Paid",
+      amount: transactionType === "plan" ? "0" : formData.amount,
+    };
+
+    addTransaction(finalData);
+
+    resetFormState();
     setIsModalOpen(false);
     setTransactionType("daily");
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    resetFormState();
   };
 
   return (
     <div className="flex h-full flex-col rounded-2xl bg-white p-5 shadow-card">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold tracking-wide text-ink-950">TODAY'S TRANSACTION</h2>
+        <h2 className="text-sm font-bold tracking-wide text-ink-950">
+          TODAY'S TRANSACTION
+        </h2>
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
@@ -151,7 +243,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
             </tr>
           </thead>
           <tbody>
-            {displayRows.map((txn) => (
+            {displayRows.map((txn) =>
               txn.isPlaceholder ? (
                 <tr key={txn.id} className="border-t border-ink-950/5">
                   <td className="py-3 pr-3">&nbsp;</td>
@@ -175,7 +267,9 @@ export default function TransactionsTable({ searchQuery = "" }) {
                     </div>
                   </td>
                   <td className="py-3 pr-3">
-                    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", MEMBER_TYPE_TONE[txn.type])}>{txn.type}</span>
+                    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", MEMBER_TYPE_TONE[txn.type])}>
+                      {txn.type}
+                    </span>
                   </td>
                   <td className="py-3 pr-3 text-ink-950/70">{txn.plan}</td>
                   <td className="py-3 pr-3">
@@ -189,14 +283,18 @@ export default function TransactionsTable({ searchQuery = "" }) {
                     {typeof txn.amount === "number" ? `P${txn.amount.toFixed(2)}` : txn.amount}
                   </td>
                   <td className="py-3 pr-3">
-                    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", PAYMENT_TONE[txn.payment])}>{txn.payment}</span>
+                    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", PAYMENT_TONE[txn.payment])}>
+                      {txn.payment}
+                    </span>
                   </td>
                   <td className="py-3">
-                    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", txn.status === "Checked In" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600")}>{txn.status}</span>
+                    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", txn.status === "Checked In" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600")}>
+                      {txn.status}
+                    </span>
                   </td>
                 </tr>
               )
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -220,7 +318,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
                   {txn.status}
                 </span>
               </div>
-              
+
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 <span className={cn("rounded-full px-2 py-1 font-medium", MEMBER_TYPE_TONE[txn.type])}>{txn.type}</span>
                 <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600">{txn.plan}</span>
@@ -250,7 +348,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
         )}
       </div>
 
-      {/* Fixed Bottom Section - Sticks to Bottom */}
+      {/* Pagination */}
       <div className="mt-auto border-t border-ink-950/5 pt-4">
         <div className="flex items-center justify-between">
           <button
@@ -274,11 +372,10 @@ export default function TransactionsTable({ searchQuery = "" }) {
           </button>
         </div>
 
-        {/* Centered View all transactions button */}
         <div className="mt-4 flex justify-center">
           <button
             type="button"
-            onClick={() => navigate("/payments")} 
+            onClick={() => navigate("/payments")}
             className="flex items-center gap-1.5 text-sm font-semibold text-sky-600 hover:text-sky-700"
           >
             View all transactions
@@ -290,22 +387,23 @@ export default function TransactionsTable({ searchQuery = "" }) {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
-            
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
+
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-ink-950">New Transaction</h3>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
                 className="rounded-full p-1 text-ink-950/50 hover:bg-gray-100 hover:text-ink-950"
               >
                 <X size={20} />
               </button>
             </div>
 
+            {/* Tabs */}
             <div className="mb-6 flex rounded-lg bg-gray-100 p-1">
               <button
                 type="button"
-                onClick={() => setTransactionType("daily")}
+                onClick={() => handleTabSwitch("daily")}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-semibold transition-all ${
                   transactionType === "daily" ? "bg-white text-ink-950 shadow-sm" : "text-ink-950/50"
                 }`}
@@ -314,7 +412,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
               </button>
               <button
                 type="button"
-                onClick={() => setTransactionType("plan")}
+                onClick={() => handleTabSwitch("plan")}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-semibold transition-all ${
                   transactionType === "plan" ? "bg-white text-ink-950 shadow-sm" : "text-ink-950/50"
                 }`}
@@ -333,11 +431,145 @@ export default function TransactionsTable({ searchQuery = "" }) {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  placeholder="Search member or enter new name..."
-                  className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
+                  placeholder={
+                    transactionType === "daily"
+                      ? "Search member or enter new name..."
+                      : "Search registered member..."
+                  }
+                  className={cn(
+                    "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors",
+                    matchedMember
+                      ? "border-emerald-300 bg-emerald-50/50 focus:border-emerald-500"
+                      : memberWarning
+                      ? "border-rose-300 bg-rose-50/50 focus:border-rose-500"
+                      : "border-ink-950/10 focus:border-gold-500"
+                  )}
                 />
+
+                {/* LIVE MEMBER PREVIEW WITH QR CODE (Plan Member tab only) */}
+                {transactionType === "plan" && matchedMember && (
+                  <div className="mt-3 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
+                    
+                    {/* Card Header */}
+                    <div className="flex items-center justify-between bg-ink-950 px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-5 w-5 items-center justify-center rounded bg-gold-500">
+                          <Dumbbell size={10} className="text-ink-950" strokeWidth={3} />
+                        </div>
+                        <p className="text-[10px] font-extrabold tracking-wider text-white">
+                          FIT<span className="text-gold-500">4</span>LESS
+                        </p>
+                      </div>
+                      <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-white/40">
+                        Member ID
+                      </p>
+                    </div>
+
+                    {/* Card Body: Info + QR side by side */}
+                    <div className="flex items-center gap-3 p-3">
+                      
+                      {/* LEFT: Avatar + Info */}
+                      <div className="flex flex-1 items-center gap-3 min-w-0">
+                        <div className={cn(
+                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white",
+                          getAvatarColor(matchedMember.name)
+                        )}>
+                          {getInitials(matchedMember.name)}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-extrabold text-ink-950">
+                            {matchedMember.name}
+                          </p>
+                          <div className="mt-0.5 flex items-center gap-1 text-[10px] font-bold text-ink-950/50">
+                            <Fingerprint size={10} />
+                            {matchedMember.id}
+                          </div>
+
+                          <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
+                            <div>
+                              <p className="text-[8px] font-bold uppercase tracking-wide text-ink-950/35">Type</p>
+                              <p className="text-[10px] font-bold text-ink-950">{matchedMember.type}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-bold uppercase tracking-wide text-ink-950/35">Plan</p>
+                              <p className="text-[10px] font-bold text-ink-950">{matchedMember.plan}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-bold uppercase tracking-wide text-ink-950/35">Start</p>
+                              <p className="text-[10px] font-bold text-ink-950">{matchedMember.startDate}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-bold uppercase tracking-wide text-ink-950/35">Expires</p>
+                              <p className="text-[10px] font-bold text-ink-950">{matchedMember.endDate}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* RIGHT: QR CODE */}
+                      <div className="flex shrink-0 flex-col items-center justify-center gap-1.5 border-l border-dashed border-ink-950/10 pl-3">
+                        <div className="rounded-lg bg-white p-1.5 ring-1 ring-ink-950/5">
+                          <QRCodeSVG
+                            value={matchedMember.qrValue || matchedMember.id}
+                            size={72}
+                            level="H"
+                            fgColor="#14141C"
+                          />
+                        </div>
+                        <p className="text-[7px] font-bold uppercase tracking-widest text-ink-950/40">
+                          Scan to Check In
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card Footer */}
+                    <div className="flex items-center justify-between border-t border-ink-950/5 bg-surface px-3 py-1.5">
+                      <p className="text-[8px] font-bold uppercase tracking-wide text-ink-950/35">
+                        Fit4Less Gym Management
+                      </p>
+                      <div className={cn(
+                        "flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide",
+                        matchedMember.status === "Active" ? "text-emerald-600" : "text-amber-600"
+                      )}>
+                        <div className={cn(
+                          "h-1 w-1 rounded-full",
+                          matchedMember.status === "Active" ? "bg-emerald-500" : "bg-amber-500"
+                        )} />
+                        {matchedMember.status}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MEMBER NOT FOUND */}
+                {transactionType === "plan" && memberWarning && !matchedMember && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-amber-900">
+                        Member Not Found
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
+                        {memberWarning}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeModal();
+                          navigate("/members/register");
+                        }}
+                        className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-600"
+                      >
+                        Register This Member
+                        <ArrowRight size={12} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* Daily Visit Fields */}
               {transactionType === "daily" && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -365,6 +597,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
                 </div>
               )}
 
+              {/* Plan Member Fields */}
               {transactionType === "plan" && (
                 <div className="rounded-lg border border-gold-500/20 bg-gold-500/5 p-4">
                   <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-gold-600">
@@ -400,6 +633,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
                 </div>
               )}
 
+              {/* Daily Payment Fields */}
               {transactionType === "daily" && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -432,16 +666,21 @@ export default function TransactionsTable({ searchQuery = "" }) {
               <div className="flex justify-end gap-3 pt-4 border-t border-ink-950/5">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="rounded-lg px-4 py-2 text-sm font-semibold text-ink-950/60 hover:bg-gray-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-ink-950 hover:bg-gold-600 ${
-                    transactionType === "plan" ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gold-500"
-                  }`}
+                  disabled={transactionType === "plan" && !matchedMember}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold transition-opacity",
+                    transactionType === "plan"
+                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                      : "bg-gold-500 text-ink-950 hover:bg-gold-600",
+                    transactionType === "plan" && !matchedMember && "cursor-not-allowed opacity-40"
+                  )}
                 >
                   {transactionType === "plan" ? (
                     <>
@@ -455,7 +694,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                 </button>
               </div>
             </form>
-
           </div>
         </div>
       )}

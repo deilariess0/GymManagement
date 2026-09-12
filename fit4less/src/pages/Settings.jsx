@@ -14,7 +14,7 @@ export default function Settings() {
     dailyRegular: "80",
     dailyStudent: "70",
     weekly: "250",
-    monthly: "600",
+    monthly: "800",
   });
 
   // Toggle States
