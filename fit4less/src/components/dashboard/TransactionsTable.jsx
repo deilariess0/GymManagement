@@ -1,19 +1,10 @@
 // src/components/dashboard/TransactionsTable.jsx
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react"; // <-- NEW
+import { QRCodeSVG } from "qrcode.react";
 import {
-  Plus,
-  ArrowRight,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  CalendarClock,
-  CheckCircle,
-  AlertTriangle,
-  Dumbbell,
-  Fingerprint,
+  Plus, ArrowRight, X, ChevronLeft, ChevronRight, User, CalendarClock,
+  CheckCircle, AlertTriangle, Dumbbell, Fingerprint,
 } from "lucide-react";
 import { useGym } from "../../context/useGym";
 import { getAllMembers } from "../../utils/memberStorage";
@@ -30,29 +21,31 @@ const PAYMENT_TONE = {
   Maya: "bg-indigo-100 text-indigo-600",
 };
 
+const MEMBERSHIP_PLANS = ["Weekly", "Monthly", "3 Months", "6 Months"];
+
+const EMPTY_FORM = {
+  name: "",
+  type: "Regular",
+  plan: "Daily",
+  discount: "",
+  amount: "80",
+  payment: "Cash",
+  status: "Paid",
+};
+
 export default function TransactionsTable({ searchQuery = "" }) {
   const navigate = useNavigate();
   const { transactions, addTransaction, getPrice } = useGym();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [successTransaction, setSuccessTransaction] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
 
   const [transactionType, setTransactionType] = useState("daily");
   const [memberWarning, setMemberWarning] = useState("");
   const [matchedMember, setMatchedMember] = useState(null);
-
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "Regular",
-    plan: "Daily",
-    discount: "",
-    amount: "80",
-    payment: "Cash",
-    status: "Paid",
-  });
-
-  const MEMBERSHIP_PLANS = ["Weekly", "Monthly", "3 Months", "6 Months"];
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   // --- UI Helpers ---
   const getInitials = (name) =>
@@ -68,6 +61,13 @@ export default function TransactionsTable({ searchQuery = "" }) {
     return colors[Math.abs(hash) % colors.length];
   };
 
+  const findMemberByName = (name) => {
+    const allMembers = getAllMembers();
+    return allMembers.find(
+      (m) => m.name.toLowerCase() === name.toLowerCase().trim()
+    );
+  };
+
   // --- Filtering ---
   const filteredTransactions = useMemo(() => {
     if (!searchQuery) return transactions;
@@ -77,15 +77,12 @@ export default function TransactionsTable({ searchQuery = "" }) {
   }, [transactions, searchQuery]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-
   const paginatedTransactions = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredTransactions, currentPage]);
 
-  useMemo(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+  useMemo(() => setCurrentPage(1), [searchQuery]);
 
   const displayRows = useMemo(() => {
     const rows = [...paginatedTransactions];
@@ -95,21 +92,12 @@ export default function TransactionsTable({ searchQuery = "" }) {
     return rows;
   }, [paginatedTransactions]);
 
-  const handlePageChange = (page) => setCurrentPage(page);
-
-  // --- Member Lookup ---
-  const findMemberByName = (name) => {
-    const allMembers = getAllMembers();
-    return allMembers.find(
-      (m) => m.name.toLowerCase() === name.toLowerCase().trim()
-    );
-  };
-
-  // --- Live Lookup (as user types) ---
+  // --- Live lookup on Plan tab ---
+  // FIXED: Now also updates formData.type and formData.plan from the matched member
   useEffect(() => {
     if (transactionType !== "plan") return;
-
     const trimmed = formData.name.trim();
+    
     if (!trimmed) {
       setMatchedMember(null);
       setMemberWarning("");
@@ -120,30 +108,25 @@ export default function TransactionsTable({ searchQuery = "" }) {
     if (found) {
       setMatchedMember(found);
       setMemberWarning("");
+      // Sync the formData type & plan to match the registered member
+      setFormData((prev) => ({
+        ...prev,
+        type: found.type,
+        plan: found.plan,
+      }));
     } else {
       setMatchedMember(null);
-      setMemberWarning(
-        `"${trimmed}" is not a registered member. Please register this person first.`
-      );
+      setMemberWarning(`"${trimmed}" is not a registered member. Please register this person first.`);
     }
   }, [formData.name, transactionType]);
 
-  // --- Reset helper ---
+  // --- Reset ---
   const resetFormState = () => {
-    setFormData({
-      name: "",
-      type: "Regular",
-      plan: "Daily",
-      discount: "",
-      amount: "80",
-      payment: "Cash",
-      status: "Paid",
-    });
+    setFormData(EMPTY_FORM);
     setMatchedMember(null);
     setMemberWarning("");
   };
 
-  // --- Tab Switch ---
   const handleTabSwitch = (type) => {
     if (type === transactionType) return;
     setTransactionType(type);
@@ -152,27 +135,16 @@ export default function TransactionsTable({ searchQuery = "" }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
     setFormData((prev) => {
-      const nextData = { ...prev, [name]: value };
-
-      if (transactionType === "plan" && name === "name") {
-        const existing = findMemberByName(value);
-        if (existing) {
-          nextData.type = existing.type;
-          nextData.plan = existing.plan;
-        }
-      }
-
+      const next = { ...prev, [name]: value };
       if (transactionType === "daily" && (name === "type" || name === "name")) {
-        const price = getPrice(nextData.type, "Daily");
-        nextData.amount = price.toString();
+        next.amount = getPrice(next.type, "Daily").toString();
       }
-
-      return nextData;
+      return next;
     });
   };
 
+  // --- Add Transaction ---
   const handleAddTransaction = (e) => {
     e.preventDefault();
 
@@ -181,25 +153,32 @@ export default function TransactionsTable({ searchQuery = "" }) {
       return;
     }
 
-    const existing = findMemberByName(formData.name);
-
-    if (!existing) {
-      setMemberWarning(
-        `"${formData.name}" is not a registered member. Please register this person first.`
-      );
-      return;
+    if (transactionType === "plan") {
+      const existing = findMemberByName(formData.name);
+      if (!existing) {
+        setMemberWarning(`"${formData.name}" is not a registered member. Please register this person first.`);
+        return;
+      }
+      // Use the registered member's actual plan (not formData.plan)
+      const planData = {
+        ...formData,
+        name: existing.name,
+        type: existing.type,
+        plan: existing.plan,
+        status: "Checked In",
+        amount: "0",
+      };
+      addTransaction(planData);
+      setSuccessTransaction(planData);
+    } else {
+      const dailyData = {
+        ...formData,
+        amount: formData.amount || getPrice(formData.type, "Daily").toString(),
+        status: "Paid",
+      };
+      addTransaction(dailyData);
+      setSuccessTransaction(dailyData);
     }
-
-    const finalData = {
-      ...formData,
-      name: existing.name,
-      type: existing.type,
-      plan: transactionType === "plan" ? existing.plan : formData.plan,
-      status: transactionType === "plan" ? "Checked In" : "Paid",
-      amount: transactionType === "plan" ? "0" : formData.amount,
-    };
-
-    addTransaction(finalData);
 
     resetFormState();
     setIsModalOpen(false);
@@ -246,14 +225,9 @@ export default function TransactionsTable({ searchQuery = "" }) {
             {displayRows.map((txn) =>
               txn.isPlaceholder ? (
                 <tr key={txn.id} className="border-t border-ink-950/5">
-                  <td className="py-3 pr-3">&nbsp;</td>
-                  <td className="py-3 pr-3">&nbsp;</td>
-                  <td className="py-3 pr-3">&nbsp;</td>
-                  <td className="py-3 pr-3">&nbsp;</td>
-                  <td className="py-3 pr-3">&nbsp;</td>
-                  <td className="py-3 pr-3">&nbsp;</td>
-                  <td className="py-3 pr-3">&nbsp;</td>
-                  <td className="py-3">&nbsp;</td>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <td key={i} className="py-3 pr-3">&nbsp;</td>
+                  ))}
                 </tr>
               ) : (
                 <tr key={txn.id} className="border-t border-ink-950/5">
@@ -354,7 +328,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
           <button
             type="button"
             disabled={currentPage === 1}
-            onClick={() => handlePageChange(currentPage - 1)}
+            onClick={() => setCurrentPage(currentPage - 1)}
             className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-ink-950/60 hover:bg-ink-950/5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeft size={14} /> Previous
@@ -365,7 +339,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
           <button
             type="button"
             disabled={currentPage === totalPages || totalPages === 0}
-            onClick={() => handlePageChange(currentPage + 1)}
+            onClick={() => setCurrentPage(currentPage + 1)}
             className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-ink-950/60 hover:bg-ink-950/5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Next <ChevronRight size={14} />
@@ -384,7 +358,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* INPUT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-6">
@@ -433,7 +407,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
                   onChange={handleChange}
                   placeholder={
                     transactionType === "daily"
-                      ? "Search member or enter new name..."
+                      ? "Enter walk-in name..."
                       : "Search registered member..."
                   }
                   className={cn(
@@ -446,11 +420,9 @@ export default function TransactionsTable({ searchQuery = "" }) {
                   )}
                 />
 
-                {/* LIVE MEMBER PREVIEW WITH QR CODE (Plan Member tab only) */}
+                {/* LIVE MEMBER PREVIEW WITH QR */}
                 {transactionType === "plan" && matchedMember && (
                   <div className="mt-3 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
-                    
-                    {/* Card Header */}
                     <div className="flex items-center justify-between bg-ink-950 px-4 py-2">
                       <div className="flex items-center gap-2">
                         <div className="flex h-5 w-5 items-center justify-center rounded bg-gold-500">
@@ -465,10 +437,7 @@ export default function TransactionsTable({ searchQuery = "" }) {
                       </p>
                     </div>
 
-                    {/* Card Body: Info + QR side by side */}
                     <div className="flex items-center gap-3 p-3">
-                      
-                      {/* LEFT: Avatar + Info */}
                       <div className="flex flex-1 items-center gap-3 min-w-0">
                         <div className={cn(
                           "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white",
@@ -507,7 +476,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                         </div>
                       </div>
 
-                      {/* RIGHT: QR CODE */}
                       <div className="flex shrink-0 flex-col items-center justify-center gap-1.5 border-l border-dashed border-ink-950/10 pl-3">
                         <div className="rounded-lg bg-white p-1.5 ring-1 ring-ink-950/5">
                           <QRCodeSVG
@@ -523,7 +491,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                       </div>
                     </div>
 
-                    {/* Card Footer */}
                     <div className="flex items-center justify-between border-t border-ink-950/5 bg-surface px-3 py-1.5">
                       <p className="text-[8px] font-bold uppercase tracking-wide text-ink-950/35">
                         Fit4Less Gym Management
@@ -547,12 +514,8 @@ export default function TransactionsTable({ searchQuery = "" }) {
                   <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                     <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
                     <div className="flex-1">
-                      <p className="text-xs font-bold text-amber-900">
-                        Member Not Found
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
-                        {memberWarning}
-                      </p>
+                      <p className="text-xs font-bold text-amber-900">Member Not Found</p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">{memberWarning}</p>
                       <button
                         type="button"
                         onClick={() => {
@@ -571,30 +534,58 @@ export default function TransactionsTable({ searchQuery = "" }) {
 
               {/* Daily Visit Fields */}
               {transactionType === "daily" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-ink-950/70">Type</label>
-                    <select
-                      name="type"
-                      value={formData.type}
-                      onChange={handleChange}
-                      className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
-                    >
-                      <option value="Regular">Regular</option>
-                      <option value="Student">Student</option>
-                    </select>
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-ink-950/70">Type</label>
+                      <select
+                        name="type"
+                        value={formData.type}
+                        onChange={handleChange}
+                        className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
+                      >
+                        <option value="Regular">Regular</option>
+                        <option value="Student">Student</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-ink-950/70">Amount (P) - Auto</label>
+                      <input
+                        type="number"
+                        name="amount"
+                        value={formData.amount}
+                        readOnly
+                        className="w-full rounded-lg border border-ink-950/10 bg-gray-50 px-3 py-2 text-sm font-bold text-ink-950 focus:outline-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-ink-950/70">Amount (P) - Auto</label>
-                    <input
-                      type="number"
-                      name="amount"
-                      value={formData.amount}
-                      readOnly
-                      className="w-full rounded-lg border border-ink-950/10 bg-gray-50 px-3 py-2 text-sm font-bold text-ink-950 focus:outline-none"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-ink-950/70">Discount (P)</label>
+                      <input
+                        type="number"
+                        name="discount"
+                        value={formData.discount}
+                        onChange={handleChange}
+                        placeholder="0.00"
+                        className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-ink-950/70">Payment Method</label>
+                      <select
+                        name="payment"
+                        value={formData.payment}
+                        onChange={handleChange}
+                        className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="GCash">GCash</option>
+                        <option value="Maya">Maya</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
 
               {/* Plan Member Fields */}
@@ -633,36 +624,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                 </div>
               )}
 
-              {/* Daily Payment Fields */}
-              {transactionType === "daily" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-ink-950/70">Discount (P)</label>
-                    <input
-                      type="number"
-                      name="discount"
-                      value={formData.discount}
-                      onChange={handleChange}
-                      placeholder="0.00"
-                      className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-ink-950/70">Payment Method</label>
-                    <select
-                      name="payment"
-                      value={formData.payment}
-                      onChange={handleChange}
-                      className="w-full rounded-lg border border-ink-950/10 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="GCash">GCash</option>
-                      <option value="Maya">Maya</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
               <div className="flex justify-end gap-3 pt-4 border-t border-ink-950/5">
                 <button
                   type="button"
@@ -694,6 +655,94 @@ export default function TransactionsTable({ searchQuery = "" }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUCCESS POPUP */}
+      {successTransaction && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-ink-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4 animate-fade-in">
+          <div className="w-full max-w-sm overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl animate-slide-up sm:animate-fade-in">
+
+            <div className="flex flex-col items-center gap-3 bg-emerald-50 px-5 py-6 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <CheckCircle size={28} strokeWidth={2.5} />
+              </div>
+              <div>
+                <p className="text-base font-bold text-emerald-900">
+                  Transaction Added
+                </p>
+                <p className="mt-0.5 text-xs text-emerald-700">
+                  {successTransaction.status === "Checked In"
+                    ? "Attendance logged successfully"
+                    : "Payment recorded successfully"}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 p-5">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white",
+                  getAvatarColor(successTransaction.name)
+                )}>
+                  {getInitials(successTransaction.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-ink-950">
+                    {successTransaction.name}
+                  </p>
+                  <p className="text-[10px] font-semibold text-ink-950/50">
+                    {successTransaction.type} • {successTransaction.plan}
+                  </p>
+                </div>
+                <span className={cn(
+                  "rounded-full px-2.5 py-1 text-[10px] font-bold shrink-0",
+                  successTransaction.status === "Checked In"
+                    ? "bg-blue-100 text-blue-600"
+                    : "bg-emerald-100 text-emerald-700"
+                )}>
+                  {successTransaction.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-surface p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/40">Amount</p>
+                  <p className="text-sm font-extrabold text-ink-950">
+                    ₱{successTransaction.status === "Checked In"
+                      ? "0.00"
+                      : Number(successTransaction.amount).toFixed(2)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-surface p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/40">Payment</p>
+                  <p className="text-sm font-extrabold text-ink-950">
+                    {successTransaction.status === "Checked In" ? "—" : successTransaction.payment}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSuccessTransaction(null)}
+                  className="flex-1 rounded-xl border border-ink-950/10 bg-white px-4 py-2.5 text-sm font-bold text-ink-950 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuccessTransaction(null);
+                    setIsModalOpen(true);
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gold-500 px-4 py-2.5 text-sm font-bold text-ink-950 hover:bg-gold-600"
+                >
+                  <Plus size={14} strokeWidth={3} /> New Again
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
