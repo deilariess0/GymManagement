@@ -1,5 +1,4 @@
-// src/context/NotificationContext.jsx
-import { createContext, useState, useCallback } from "react";
+import { createContext, useState, useCallback, useRef } from "react";
 
 export const NotificationContext = createContext();
 
@@ -12,8 +11,13 @@ const INITIAL_NOTIFICATIONS = [
 
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [activeToasts, setActiveToasts] = useState([]); // <-- New state for popups
 
-  // Push a new notification. Always appears at the top, unread.
+  const removeToast = useCallback((id) => {
+    setActiveToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  // Push a new notification. Appears in the Topbar AND as a popup.
   const addNotification = useCallback(({ type, title }) => {
     const newNotif = {
       id: Date.now() + Math.random(),
@@ -22,8 +26,16 @@ export function NotificationProvider({ children }) {
       time: "Just now",
       read: false,
     };
+    
+    // 1. Add to Topbar list
     setNotifications((prev) => [newNotif, ...prev]);
-  }, []);
+    
+    // 2. Show visual popup (and auto-dismiss after 4 seconds)
+    setActiveToasts((prev) => [...prev, newNotif]);
+    setTimeout(() => {
+      removeToast(newNotif.id);
+    }, 4000);
+  }, [removeToast]);
 
   const markAsRead = useCallback((id) => {
     setNotifications((prev) =>
@@ -39,7 +51,15 @@ export function NotificationProvider({ children }) {
 
   return (
     <NotificationContext.Provider
-      value={{ notifications, unreadCount, addNotification, markAsRead, markAllRead }}
+      value={{ 
+        notifications, 
+        unreadCount, 
+        addNotification, 
+        markAsRead, 
+        markAllRead,
+        activeToasts,       // <-- Export for the UI
+        removeToast         // <-- Export for manual closing
+      }}
     >
       {children}
     </NotificationContext.Provider>
