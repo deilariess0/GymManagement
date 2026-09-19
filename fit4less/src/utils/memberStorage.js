@@ -28,7 +28,7 @@ export const saveMembers = (members) => {
 export const addMemberToStorage = (newMember) => {
   const current = getAllMembers();
   const filtered = current.filter((m) => m.id !== newMember.id);
-  const updated = [...filtered, newMember];
+  const updated = [newMember, ...filtered]; // ← NEW MEMBER FIRST
   saveMembers(updated);
   return updated;
 };
