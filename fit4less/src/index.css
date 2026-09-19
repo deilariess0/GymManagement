@@ -24,3 +24,40 @@ body {
   background-color: #d8dae3;
   border-radius: 999px;
 }
+
+/* Dropdown motion — used by Topbar (notifications & profile) */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+@keyframes dropdown-out {
+  from { opacity: 1; transform: scale(1)    translateY(0);    }
+  to   { opacity: 0; transform: scale(0.95) translateY(-8px); }
+}
+
+@keyframes dropdown-item-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+
+.animate-dropdown-in,
+.animate-dropdown-out,
+.animate-dropdown-item {
+  transform-origin: top right;
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.animate-dropdown-in  { animation-name: dropdown-in;  }
+.animate-dropdown-out { animation-name: dropdown-out; animation-duration: 140ms; }
+.animate-dropdown-item { animation-name: dropdown-item-in; animation-duration: 220ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dropdown-in,
+  .animate-dropdown-out,
+  .animate-dropdown-item {
+    animation: none;
+  }
+}

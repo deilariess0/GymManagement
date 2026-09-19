@@ -14,11 +14,11 @@ import {
   X,
 } from "lucide-react";
 import { getAllMembers, addMemberToStorage } from "../utils/memberStorage";
-import { GYM_PRICING } from "../data/pricing"; // <-- IMPORT PRICING
+import { GYM_PRICING } from "../data/pricing";
+import { useNotifications } from "../context/useNotifications"; // <-- ADD
 
 const MEMBERSHIP_PLANS = ["Weekly", "Monthly", "3 Months", "6 Months"];
 
-// Plan duration in days
 const PLAN_DAYS = {
   Weekly: 7,
   Monthly: 30,
@@ -26,13 +26,13 @@ const PLAN_DAYS = {
   "6 Months": 180,
 };
 
-// Helper: Get price based on BOTH type and plan
 const getPlanPrice = (type, plan) => {
   return GYM_PRICING?.[type]?.[plan] || 0;
 };
 
 export default function RegisterMember() {
   const navigate = useNavigate();
+  const { addNotification } = useNotifications(); // <-- ADD
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [newMember, setNewMember] = useState(null);
 
@@ -48,7 +48,6 @@ export default function RegisterMember() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Generate the next sequential member ID (e.g., M-0001, M-0002, etc.)
   const generateMemberId = () => {
     const existing = getAllMembers();
     const numericIds = existing
@@ -64,7 +63,6 @@ export default function RegisterMember() {
     e.preventDefault();
     if (!formData.name.trim()) return alert("Please enter a member name");
 
-    // Check for duplicate names (case-insensitive)
     const existing = getAllMembers();
     const duplicate = existing.find(
       (m) => m.name.toLowerCase() === formData.name.toLowerCase().trim()
@@ -75,13 +73,11 @@ export default function RegisterMember() {
 
     const memberId = generateMemberId();
 
-    // Calculate start/end dates based on plan
     const today = new Date();
     const startDate = today.toISOString().split("T")[0];
     const endDate = new Date(today);
     endDate.setDate(endDate.getDate() + (PLAN_DAYS[formData.plan] || 30));
 
-    // FIXED: Look up price by BOTH type and plan
     const planAmount = getPlanPrice(formData.type, formData.plan);
 
     const member = {
@@ -99,11 +95,15 @@ export default function RegisterMember() {
     };
 
     addMemberToStorage(member);
+
+    // 🔔 FIRE NOTIFICATION — new member registered
+    addNotification({
+      type: "member",
+      title: `New member registered: ${member.name} (${member.plan})`,
+    });
+
     setNewMember(member);
-
-    // Reset form fields
     setFormData({ name: "", type: "Regular", plan: "Monthly", contact: "" });
-
     setShowSuccessModal(true);
   };
 
@@ -145,7 +145,6 @@ export default function RegisterMember() {
   const getInitials = (name) =>
     name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2);
 
-  // Current preview price (updates live as user changes type/plan)
   const previewPrice = getPlanPrice(formData.type, formData.plan);
 
   return (
@@ -238,7 +237,6 @@ export default function RegisterMember() {
               </div>
             </div>
 
-            {/* Live price preview — updates when type OR plan changes */}
             <div className="rounded-xl border border-gold-500/20 bg-gold-500/5 p-3">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-ink-950/60">
@@ -278,7 +276,6 @@ export default function RegisterMember() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4 animate-fade-in">
           <div className="max-h-[95vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl animate-slide-up sm:animate-fade-in">
 
-            {/* Success Banner */}
             <div className="relative bg-emerald-50 p-5">
               <button
                 onClick={handleCloseModal}
@@ -302,11 +299,8 @@ export default function RegisterMember() {
               </div>
             </div>
 
-            {/* ID Card Preview */}
             <div className="p-5">
               <div className="overflow-hidden rounded-2xl border border-ink-950/10 shadow-sm">
-
-                {/* Card Header */}
                 <div className="flex items-center justify-between bg-ink-950 px-5 py-3">
                   <div className="flex items-center gap-2">
                     <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gold-500">
@@ -321,10 +315,7 @@ export default function RegisterMember() {
                   </p>
                 </div>
 
-                {/* Card Body */}
                 <div className="flex flex-col gap-5 bg-white p-5 sm:flex-row sm:items-center sm:gap-6">
-
-                  {/* LEFT: Member Info */}
                   <div className="flex flex-1 items-center gap-4">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gold-500 text-lg font-extrabold text-ink-950">
                       {getInitials(newMember.name)}
@@ -341,37 +332,27 @@ export default function RegisterMember() {
 
                       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
                         <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">
-                            Type
-                          </p>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Type</p>
                           <p className="text-xs font-bold text-ink-950">{newMember.type}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">
-                            Plan
-                          </p>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Plan</p>
                           <p className="text-xs font-bold text-ink-950">{newMember.plan}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">
-                            Start Date
-                          </p>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Start Date</p>
                           <p className="text-xs font-bold text-ink-950">{newMember.startDate}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">
-                            Expires
-                          </p>
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">Expires</p>
                           <p className="text-xs font-bold text-ink-950">{newMember.endDate}</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Divider */}
                   <div className="hidden h-32 w-px bg-ink-950/10 sm:block" />
 
-                  {/* RIGHT: QR Code */}
                   <div className="flex shrink-0 flex-col items-center justify-center gap-2">
                     <div className="rounded-xl bg-white p-2 ring-1 ring-ink-950/5">
                       <QRCodeSVG
@@ -388,7 +369,6 @@ export default function RegisterMember() {
                   </div>
                 </div>
 
-                {/* Card Footer */}
                 <div className="border-t border-ink-950/5 bg-surface px-5 py-2.5">
                   <div className="flex items-center justify-between">
                     <p className="text-[9px] font-bold uppercase tracking-wide text-ink-950/35">
@@ -402,7 +382,6 @@ export default function RegisterMember() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={handleDownloadQR}

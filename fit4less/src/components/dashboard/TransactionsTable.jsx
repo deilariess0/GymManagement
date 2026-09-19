@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useGym } from "../../context/useGym";
 import { getAllMembers } from "../../utils/memberStorage";
+import { useNotifications } from "../../context/useNotifications"; // <-- ADD
 import { cn } from "../../utils/cn";
 
 const MEMBER_TYPE_TONE = {
@@ -36,6 +37,7 @@ const EMPTY_FORM = {
 export default function TransactionsTable({ searchQuery = "" }) {
   const navigate = useNavigate();
   const { transactions, addTransaction, getPrice } = useGym();
+  const { addNotification } = useNotifications(); // <-- ADD
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [successTransaction, setSuccessTransaction] = useState(null);
@@ -47,7 +49,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
   const [matchedMember, setMatchedMember] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
 
-  // --- UI Helpers ---
   const getInitials = (name) =>
     name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2);
 
@@ -68,7 +69,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
     );
   };
 
-  // --- Filtering ---
   const filteredTransactions = useMemo(() => {
     if (!searchQuery) return transactions;
     return transactions.filter((t) =>
@@ -92,12 +92,10 @@ export default function TransactionsTable({ searchQuery = "" }) {
     return rows;
   }, [paginatedTransactions]);
 
-  // --- Live lookup on Plan tab ---
-  // FIXED: Now also updates formData.type and formData.plan from the matched member
   useEffect(() => {
     if (transactionType !== "plan") return;
     const trimmed = formData.name.trim();
-    
+
     if (!trimmed) {
       setMatchedMember(null);
       setMemberWarning("");
@@ -108,7 +106,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
     if (found) {
       setMatchedMember(found);
       setMemberWarning("");
-      // Sync the formData type & plan to match the registered member
       setFormData((prev) => ({
         ...prev,
         type: found.type,
@@ -120,7 +117,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
     }
   }, [formData.name, transactionType]);
 
-  // --- Reset ---
   const resetFormState = () => {
     setFormData(EMPTY_FORM);
     setMatchedMember(null);
@@ -144,7 +140,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
     });
   };
 
-  // --- Add Transaction ---
   const handleAddTransaction = (e) => {
     e.preventDefault();
 
@@ -159,7 +154,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
         setMemberWarning(`"${formData.name}" is not a registered member. Please register this person first.`);
         return;
       }
-      // Use the registered member's actual plan (not formData.plan)
       const planData = {
         ...formData,
         name: existing.name,
@@ -170,6 +164,12 @@ export default function TransactionsTable({ searchQuery = "" }) {
       };
       addTransaction(planData);
       setSuccessTransaction(planData);
+
+      // 🔔 FIRE NOTIFICATION — Plan member checked in
+      addNotification({
+        type: "checkin",
+        title: `${planData.name} checked in (${planData.plan})`,
+      });
     } else {
       const dailyData = {
         ...formData,
@@ -178,6 +178,12 @@ export default function TransactionsTable({ searchQuery = "" }) {
       };
       addTransaction(dailyData);
       setSuccessTransaction(dailyData);
+
+      // 🔔 FIRE NOTIFICATION — Walk-in paid
+      addNotification({
+        type: "payment",
+        title: `Walk-in payment: ₱${Number(dailyData.amount).toFixed(2)} from ${dailyData.name}`,
+      });
     }
 
     resetFormState();
@@ -373,7 +379,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
               </button>
             </div>
 
-            {/* Tabs */}
             <div className="mb-6 flex rounded-lg bg-gray-100 p-1">
               <button
                 type="button"
@@ -420,7 +425,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                   )}
                 />
 
-                {/* LIVE MEMBER PREVIEW WITH QR */}
                 {transactionType === "plan" && matchedMember && (
                   <div className="mt-3 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
                     <div className="flex items-center justify-between bg-ink-950 px-4 py-2">
@@ -509,7 +513,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                   </div>
                 )}
 
-                {/* MEMBER NOT FOUND */}
                 {transactionType === "plan" && memberWarning && !matchedMember && (
                   <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                     <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
@@ -532,7 +535,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                 )}
               </div>
 
-              {/* Daily Visit Fields */}
               {transactionType === "daily" && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -588,7 +590,6 @@ export default function TransactionsTable({ searchQuery = "" }) {
                 </>
               )}
 
-              {/* Plan Member Fields */}
               {transactionType === "plan" && (
                 <div className="rounded-lg border border-gold-500/20 bg-gold-500/5 p-4">
                   <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-gold-600">
