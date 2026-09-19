@@ -16,8 +16,9 @@ const NOTIFICATION_ICONS = {
   member:   { icon: UserPlus,      color: "bg-violet-100 text-violet-600" },
 };
 
+// Base dropdown styling. We removed "absolute right-0" so we can control it per device.
 const DROPDOWN_SURFACE =
-  "absolute right-0 top-12 z-50 overflow-hidden rounded-2xl border border-ink-950/5 bg-white shadow-card";
+  "z-50 overflow-hidden rounded-2xl border border-ink-950/5 bg-white shadow-card";
 
 const ITEM_HOVER = "hover:bg-ink-950/[0.04]";
 
@@ -109,8 +110,8 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
   };
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-[76px] items-center gap-4 border-b border-ink-950/5 bg-white px-5 shadow-sm lg:px-8">
-
+    <header className="sticky top-0 z-30 flex min-h-[64px] items-center gap-2 border-b border-ink-950/5 bg-white px-3 shadow-sm sm:px-5 lg:px-8">
+      
       {/* Desktop Hamburger Menu */}
       <button
         type="button"
@@ -124,10 +125,10 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
       {/* Mobile Branding */}
       <div className="flex items-center lg:hidden">
         <div className="leading-tight">
-          <p className="text-base font-extrabold tracking-tight text-ink-950">
+          <p className="text-sm font-extrabold tracking-tight text-ink-950">
             FIT<span className="text-gold-500">4</span>LESS
           </p>
-          <p className="text-[8px] font-bold tracking-[0.15em] text-ink-950/40">
+          <p className="text-[7px] font-bold tracking-[0.15em] text-ink-950/40">
             GYM MANAGEMENT
           </p>
         </div>
@@ -144,7 +145,7 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
       </div>
 
       {/* Right Side Controls */}
-      <div className="ml-auto flex items-center justify-end gap-3">
+      <div className="ml-auto flex items-center justify-end gap-1.5 sm:gap-3">
 
         {/* ============ NOTIFICATIONS ============ */}
         <div className="relative" ref={notificationRef}>
@@ -168,7 +169,7 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
               )}
             />
             {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold text-white">
                 {unreadCount}
               </span>
             )}
@@ -178,7 +179,11 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
             <div
               className={cn(
                 DROPDOWN_SURFACE,
-                "w-80 sm:w-96",
+                // Mobile: absolute positioned, but anchored to the right edge of the bell 
+                // and spanning most of the screen width without overflowing.
+                "absolute -right-14 top-12 w-[calc(100vw-24px)] max-w-sm",
+                // Desktop: standard width, anchored to the right.
+                "sm:right-0 sm:w-96",
                 showNotifications ? "animate-dropdown-in" : "animate-dropdown-out"
               )}
             >
@@ -199,7 +204,7 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
               </div>
 
               {/* List */}
-              <div className="max-h-80 overflow-y-auto">
+              <div className="max-h-[60vh] overflow-y-auto sm:max-h-80">
                 {notifications.length > 0 ? (
                   notifications.map((notif, index) => {
                     const config = NOTIFICATION_ICONS[notif.type] || NOTIFICATION_ICONS.checkin;
@@ -272,7 +277,7 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
             type="button"
             onClick={handleToggleProfile}
             className={cn(
-              "flex items-center gap-2.5 rounded-xl pl-1 pr-2 transition-all duration-200",
+              "flex items-center gap-2 rounded-xl pl-1 pr-1 sm:pr-2 transition-all duration-200",
               showProfile ? "bg-ink-950/5" : "hover:bg-ink-950/5"
             )}
             aria-expanded={showProfile}
@@ -297,7 +302,7 @@ export default function Topbar({ title, subtitle, onMenuClick, onToggleCollapse 
             <div
               className={cn(
                 DROPDOWN_SURFACE,
-                "w-64",
+                "absolute right-0 top-12 w-64", // Anchored to the right of the profile button
                 showProfile ? "animate-dropdown-in" : "animate-dropdown-out"
               )}
             >
